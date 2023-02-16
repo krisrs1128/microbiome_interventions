@@ -15,7 +15,7 @@ setClass(
 setClass(
   "transfer_model",
   slots = c(
-    parameters = "list",
+    parameters = "ANY",
     method = "character"
   )
 )

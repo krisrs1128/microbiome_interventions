@@ -23,30 +23,19 @@ interventions[2, c(50:70)] <- 1
 interventions[3, c(50:60)] <- 1
 interventions[4, c(80:90)] <- 1
 
-res <- dlm_ensemble(interventions, 2, sigma_a = 0.4, sigma_b = 0.4, sigma_e = 0.1, sigma_z = 0.2, P = 2, Q = 2)
-plot(res$x[[1]]@values[1, ])
-plot(res$x[[1]]@values[2, ])
-plot(res$z[[1]][1, ])
-plot(res$z[[1]][2, ])
+truth <- gaussian_latent_ensemble(interventions, 2, sigma_a = 0.4, sigma_b = 0.4, sigma_e = 0.1, sigma_z = 0.2, P = 2, Q = 2)
+plot(truth$x[[1]]@values[1, ])
+plot(truth$x[[1]]@values[2, ])
+plot(truth$z[[1]][1, ])
+plot(truth$z[[1]][2, ])
 
-heatmap(res$x[[1]]@values)
-heatmap(res$x[[2]]@values)
+heatmap(truth$x[[1]]@values)
+heatmap(truth$x[[2]]@values)
 ```
 
 ```{r}
-model <- cmdstan_model("dlm.stan")
-data_list <- list(
-  x = res$x[[1]]@values,
-  interventions = interventions,
-  P = length(res$params$A),
-  Q = length(res$params$B),
-  K = nrow(res$z[[1]]),
-  D = n_interventions,
-  N = n_timepoints,
-  V = nrow(res$x[[1]])
-)
-
-fit <- model$variational(data_list)
+hyper <- list(P = 2, Q = 2, K = 3)
+fit <- train(truth$x, "gaussian_latent", hyper)@parameters
 ```
 
 ```{r}
@@ -68,7 +57,7 @@ ggplot(z_post) +
 ```
 
 ```{r}
-z <- as_tibble(t(res$z[[1]])) %>%
+z <- as_tibble(t(truth$z[[1]])) %>%
   mutate(n = row_number()) %>%
   pivot_longer(-n, names_to = "k")
 

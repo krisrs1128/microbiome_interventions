@@ -7,13 +7,6 @@ train_test_split <- function(ts_inter, p_test = 0.2) {
 }
 
 #' @export
-train <- function(ts_inter, method = "zeros") {
-  if (method == "zeros") {
-    new("transfer_model", parameters = list(), method = method)
-  }
-}
-
-#' @export
 post_intervention <- function(interventions, window) {
   result <- rep(FALSE, length(interventions))
   for (i in seq_along(result)) {
