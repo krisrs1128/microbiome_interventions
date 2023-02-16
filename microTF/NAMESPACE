@@ -2,6 +2,9 @@
 
 export(cross_validate)
 export(evaluation)
+export(gaussian_latent)
+export(gaussian_latent_ensemble)
+export(gaussian_latent_params)
 export(post_intervention)
 export(train)
 export(train_test_split)
