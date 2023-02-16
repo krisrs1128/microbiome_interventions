@@ -5,18 +5,16 @@ sparse_normal <- function(n, m, mu = 0, sigma = 1, s = .2) {
   x
 }
 
-matunif <- function(n, m, min = -1, max = 1) {
-  matrix(runif(n * m, min, max), n, m)
-}
-
-dlm_params <- function(k_factors, n_species, sigma_a, sigma_b, P, Q) {
+#' @export
+gaussian_latent_params <- function(k_factors, n_species, sigma_a, sigma_b, P, Q) {
   A <- map(seq_len(P), ~ sparse_normal(k_factors, k_factors, 0, sigma_a))
   B <- map(seq_len(Q), ~ sparse_normal(k_factors, nrow(interventions), 0, sigma_b))
   L <- matrix(rnorm(n_species * k_factors), n_species, k_factors)
   list(A = A, B = B, L = L)
 }
 
-dlm <- function(interventions, params, sigma_z, sigma_e) {
+#' @export
+gaussian_latent <- function(interventions, params, sigma_z, sigma_e) {
   attach(params)
   k_factors <- ncol(A[[1]])
   n_species <- nrow(L)
@@ -41,15 +39,16 @@ dlm <- function(interventions, params, sigma_z, sigma_e) {
   list(z = z, x = x, params = params)
 }
 
-dlm_ensemble <- function(interventions, n_subjects = 10, n_species = 250, 
+#' @export
+gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species = 250, 
                          k_factors = 3, sigma_a = 0.3, sigma_b = 0.2, 
                          sigma_z = 0.1, sigma_e = 0.2, P = 1, Q = 1) {
-  params <- dlm_params(k_factors, n_species, sigma_a, sigma_b, P, Q)
+  params <- gaussian_latent_params(k_factors, n_species, sigma_a, sigma_b, P, Q)
   ensemble <- list()
   z <- list()
 
   for (i in seq_len(n_subjects)) {
-    samples <- dlm(interventions, params, sigma_z, sigma_e)
+    samples <- gaussian_latent(interventions, params, sigma_z, sigma_e)
     ensemble[[i]] <- new(
       "ts_inter_single", 
       values = samples$x,

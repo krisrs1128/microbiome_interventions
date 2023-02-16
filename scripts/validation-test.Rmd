@@ -10,8 +10,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 
 ```{r}
 library(tidyverse)
-source("class-definitions.R")
-source("validation.R")
+library(microTF)
 ```
 
 ```{r}

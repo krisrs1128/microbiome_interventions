@@ -64,6 +64,3 @@ setMethod("[", c("ts_inter", "logical", "missing", "ANY"), function(x, i, j, ...
 setMethod("[[", c("ts_inter", "logical", "missing"), function(x, i, j, ...) x@series[[i]])
 setMethod("[[<-", c("ts_inter_single", "matrix"), function(x, i, j, ...) x@series[[i]])
 setMethod("predict",  c(object = "transfer_model"), transfer_predict)
-
-
-

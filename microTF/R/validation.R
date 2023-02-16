@@ -1,16 +1,19 @@
 
+#' @export
 train_test_split <- function(ts_inter, p_test = 0.2) {
   N <- length(ts_inter)
   test_ix <- seq_len(N) %in% sample(N, N * p_test)
   list(train = ts_inter[!test_ix], test = ts_inter[test_ix])
 }
 
+#' @export
 train <- function(ts_inter, method = "zeros") {
   if (method == "zeros") {
     new("transfer_model", parameters = list(), method = method)
   }
 }
 
+#' @export
 post_intervention <- function(interventions, window) {
   result <- rep(FALSE, length(interventions))
   for (i in seq_along(result)) {
@@ -22,6 +25,8 @@ post_intervention <- function(interventions, window) {
   result
 }
 
+#' @importFrom dplyr bind_rows
+#' @export
 evaluation <- function(y, y_hat, window = 10) {
   residuals <- list()
   avg_err <- list()
@@ -38,6 +43,8 @@ evaluation <- function(y, y_hat, window = 10) {
   bind_rows(avg_err, .id = "subject")
 }
 
+#' @importFrom dplyr bind_rows
+#' @export
 cross_validate <- function(ts_inter, train, n_ahead = 1, K = 5, n_reps = 5) {
   N <- length(ts_inter)
 
