@@ -11,8 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```{r}
 library(tidyverse)
 library(cmdstanr)
-source("class-definitions.R")
-source("dlm.R")
+library(microTF)
 set.seed(20230215)
 
 n_timepoints <- 100
