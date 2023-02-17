@@ -62,47 +62,15 @@ gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species =
 }
 
 guassian_latent_predict <- function(x_obs, interventions, params) {
-  z <- gaussian_infer_latent(x_obs, interventions, params)
-  z_future <- gaussian_forecast_latent(z, interventions)
-  x_future <- gaussian_forecast_observed(z_future)
-}
-
-posterior_means <- function(draws, index_names = c("V", "K")) {
-  summarise_draws(draws, "mean") %>%
-    mutate(index = str_extract(variable, "[0-9,]+")) %>%
-    separate(index, index_names, convert = TRUE) %>%
-    select(-variable)
-}
-
-pivot_list <- function(x, var1, var2) {
-  x %>%
-    split(.$P, ~ pivot_wider(names_from = any_of(var1), values_from = mean)) %>%
-    map(~ select(., -P)) %>%
-    map(~ pivot_wider(., names_from = any_of(var2), values_from = mean)) %>%
-    map(~ select(., -var1)) %>%
-    map(~ as.matrix(.))
-}
-
-#' @importFrom posterior summarise_draws
-summarize_posterior <- function(params) {
-  L <- posterior_means(params$draws("L"), c("K", "V")) %>%
-    pivot_wider(names_from = V, values_from = mean) %>%
-    arrange(K) %>%
-    column_to_rownames("K")
-  A <- posterior_means(params$draws("A"), c("P", "K1", "K2")) %>%
-    pivot_list("K1", "K2")
-  B <- posterior_means(params$draws("B"), c("P", "K", "D")) %>%
-    pivot_list("K", "D")
-  sigma_e <- summarise_draws(params$draws("sigma_e"), "mean") %>%
-    pull(mean)
-  sigma_z <- summarise_draws(params$draws("sigma_z"), "mean") %>%
-    pull(mean)
-  
-  list(L = L, A = A, B = B, sigma_e = sigma_e, sigma_z = sigma_z, K = nrow(A[[1]]))
-}
-
-gaussian_infer_latent <- function(x_obs, interventions, params) {
   params <- summarize_posterior(params)
+  z <- gaussian_infer_latent(x_obs, interventions, params)
+  z_future <- gaussian_forecast_latent(z, interventions, params$A, params$B, params$sigma_z)
+  x_future <- gaussian_forecast_observed(z_future, params$B, params$L, params$sigma_e)
+}
+
+#' @importFrom cmdstanr cmdstan_model
+#' @export
+gaussian_infer_latent <- function(x_obs, interventions, params, n_draws = 100) {
   data_list <- list(
     x = x_obs,
     interventions = interventions,
@@ -120,5 +88,45 @@ gaussian_infer_latent <- function(x_obs, interventions, params) {
   )
 
   model <- cmdstan_model("microTF/inst/gaussian_infer_latent.stan")
-  model$variational(data_list)
+  fit <- model$variational(data_list)
+  reshape_forecast(fit$draws("z")[1:n_draws, ])
+}
+
+#' @export
+gaussian_forecast_latent <- function(z, interventions, A, B, sigma_z, H = 10) {
+  forecasts <- list()
+  for (i in seq_along(z)) {
+    forecasts[[i]] <- gaussian_forecast_latent_(z[[i]], interventions, A, B, sigma_z, H)
+  }
+  forecasts
+}
+
+gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z, H) {
+  K <- nrow(zi)
+  forecast <- cbind(zi, matrix(0, K, H))
+  n_obs <- ncol(zi)
+  
+  for (h in seq_len(H)) {
+    for (p in seq_along(A)) {
+      forecast[, n_obs + h] <- forecast[, n_obs + h] + A[[p]] %*% forecast[, n_obs + h - p] 
+    }
+    for (q in seq_along(B)) {
+      forecast[, n_obs + h] <- forecast[, n_obs + h] + B[[q]] %*% interventions[, n_obs + h - q] 
+    }
+    forecast[, n_obs + h] <- forecast[, n_obs + h] + rnorm(K, 0, sigma_z)
+  }
+
+  forecast[, -c(1:n_obs)]
+}
+
+gaussian_forecast_observed <- function(z, L, sigma_e) {
+  D <- nrow(L)
+  H <- ncol(z)
+  forecast <- matrix(0, D, H)
+  
+  for (h in seq_len(H)) {
+    forecast[, h] <- L %*% z[, h] + rnorm(D, 0, sigma_e)
+  }
+  
+  forecast
 }
