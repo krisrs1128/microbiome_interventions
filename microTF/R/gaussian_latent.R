@@ -60,3 +60,65 @@ gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species =
   
   list(x = new("ts_inter", series = ensemble), params = params, z = z)
 }
+
+guassian_latent_predict <- function(x_obs, interventions, params) {
+  z <- gaussian_infer_latent(x_obs, interventions, params)
+  z_future <- gaussian_forecast_latent(z, interventions)
+  x_future <- gaussian_forecast_observed(z_future)
+}
+
+posterior_means <- function(draws, index_names = c("V", "K")) {
+  summarise_draws(draws, "mean") %>%
+    mutate(index = str_extract(variable, "[0-9,]+")) %>%
+    separate(index, index_names, convert = TRUE) %>%
+    select(-variable)
+}
+
+pivot_list <- function(x, var1, var2) {
+  x %>%
+    split(.$P, ~ pivot_wider(names_from = any_of(var1), values_from = mean)) %>%
+    map(~ select(., -P)) %>%
+    map(~ pivot_wider(., names_from = any_of(var2), values_from = mean)) %>%
+    map(~ select(., -var1)) %>%
+    map(~ as.matrix(.))
+}
+
+#' @importFrom posterior summarise_draws
+summarize_posterior <- function(params) {
+  L <- posterior_means(params$draws("L"), c("K", "V")) %>%
+    pivot_wider(names_from = V, values_from = mean) %>%
+    arrange(K) %>%
+    column_to_rownames("K")
+  A <- posterior_means(params$draws("A"), c("P", "K1", "K2")) %>%
+    pivot_list("K1", "K2")
+  B <- posterior_means(params$draws("B"), c("P", "K", "D")) %>%
+    pivot_list("K", "D")
+  sigma_e <- summarise_draws(params$draws("sigma_e"), "mean") %>%
+    pull(mean)
+  sigma_z <- summarise_draws(params$draws("sigma_z"), "mean") %>%
+    pull(mean)
+  
+  list(L = L, A = A, B = B, sigma_e = sigma_e, sigma_z = sigma_z, K = nrow(A[[1]]))
+}
+
+gaussian_infer_latent <- function(x_obs, interventions, params) {
+  params <- summarize_posterior(params)
+  data_list <- list(
+    x = x_obs,
+    interventions = interventions,
+    A = params$A,
+    B = params$B,
+    L = params$L,
+    K = params$K,
+    sigma_e = params$sigma_e,
+    sigma_z = params$sigma_z,
+    N = ncol(x_obs),
+    V = nrow(x_obs),
+    P = length(params$A),
+    Q = length(params$B),
+    D = nrow(interventions)
+  )
+
+  model <- cmdstan_model("microTF/inst/gaussian_infer_latent.stan")
+  model$variational(data_list)
+}

@@ -66,3 +66,8 @@ ggplot(z) +
   facet_wrap(~ k)
 ```
 
+```{r}
+x_obs <- truth$x[[2]]@values
+interventions <- truth$x[[2]]@interventions
+```
+
