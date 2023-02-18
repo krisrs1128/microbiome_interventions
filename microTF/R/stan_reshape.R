@@ -1,8 +1,10 @@
 
+#' @importFrom magrittr %>%
 #' @importFrom tidyr separate
 #' @importFrom stringr str_extract
 #' @importFrom dplyr mutate select
 #' @importFrom posterior summarise_draws
+#' @export
 posterior_means <- function(draws, index_names = c("V", "K")) {
   summarise_draws(draws, "mean") %>%
     mutate(index = str_extract(variable, "[0-9,]+")) %>%
@@ -10,6 +12,7 @@ posterior_means <- function(draws, index_names = c("V", "K")) {
     select(-variable)
 }
 
+#' @importFrom magrittr %>%
 #' @importFrom dplyr select any_of
 #' @importFrom purrr map
 #' @importFrom tidyr pivot_wider
@@ -22,6 +25,11 @@ pivot_list <- function(x, var1, var2) {
     map(~ as.matrix(.))
 }
 
+#' @importFrom magrittr %>%
+#' @importFrom tibble as_tibble rownames_to_column
+#' @importFrom tidyr pivot_longer separate pivot_wider
+#' @importFrom dplyr mutate select
+#' @importFrom purrr map
 reshape_forecast <- function(draws) {
   draws %>%
     as_tibble() %>%
@@ -35,6 +43,8 @@ reshape_forecast <- function(draws) {
     map(~ as.matrix(select(., -K:-draw)))
 }
 
+#' @importFrom magrittr %>%
+#' @importFrom dplyr pull
 #' @importFrom posterior summarise_draws
 summarize_posterior <- function(params) {
   L <- posterior_means(params$draws("L"), c("K", "V")) %>%

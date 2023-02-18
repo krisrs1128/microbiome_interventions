@@ -61,11 +61,15 @@ gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species =
   list(x = new("ts_inter", series = ensemble), params = params, z = z)
 }
 
-guassian_latent_predict <- function(x_obs, interventions, params) {
+#' @export
+gaussian_latent_predict <- function(ts_inter, interventions, params) {
   params <- summarize_posterior(params)
-  z <- gaussian_infer_latent(x_obs, interventions, params)
-  z_future <- gaussian_forecast_latent(z, interventions, params$A, params$B, params$sigma_z)
-  x_future <- gaussian_forecast_observed(z_future, params$B, params$L, params$sigma_e)
+  z_past <- gaussian_infer_latent(ts_inter@values, ts_inter@interventions, params)
+
+  interventions <- cbind(ts_inter@interventions, interventions)
+  z <- gaussian_forecast_latent(z_past, interventions, params$A, params$B, params$sigma_z)
+  x <- gaussian_forecast_observed(z, as.matrix(params$L), params$sigma_e)
+  list(z_past = z_past, z = z, x = x)
 }
 
 #' @importFrom cmdstanr cmdstan_model
@@ -87,22 +91,23 @@ gaussian_infer_latent <- function(x_obs, interventions, params, n_draws = 100) {
     D = nrow(interventions)
   )
 
-  model <- cmdstan_model("microTF/inst/gaussian_infer_latent.stan")
+  model <- cmdstan_model(system.file("gaussian_infer_latent.stan", package = "microTF"))
   fit <- model$variational(data_list)
   reshape_forecast(fit$draws("z")[1:n_draws, ])
 }
 
 #' @export
-gaussian_forecast_latent <- function(z, interventions, A, B, sigma_z, H = 10) {
+gaussian_forecast_latent <- function(z, interventions, A, B, sigma_z) {
   forecasts <- list()
   for (i in seq_along(z)) {
-    forecasts[[i]] <- gaussian_forecast_latent_(z[[i]], interventions, A, B, sigma_z, H)
+    forecasts[[i]] <- gaussian_forecast_latent_(z[[i]], interventions, A, B, sigma_z)
   }
   forecasts
 }
 
-gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z, H) {
+gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z) {
   K <- nrow(zi)
+  H <- ncol(interventions) - ncol(zi)
   forecast <- cbind(zi, matrix(0, K, H))
   n_obs <- ncol(zi)
   
@@ -119,13 +124,17 @@ gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z, H) {
   forecast[, -c(1:n_obs)]
 }
 
+#' @export
 gaussian_forecast_observed <- function(z, L, sigma_e) {
-  D <- nrow(L)
-  H <- ncol(z)
-  forecast <- matrix(0, D, H)
+  n_draws <- length(z)
+  D <- ncol(L)
+  H <- ncol(z[[1]])
+  forecast <- replicate(n_draws, matrix(0, D, H), simplify = FALSE)
   
-  for (h in seq_len(H)) {
-    forecast[, h] <- L %*% z[, h] + rnorm(D, 0, sigma_e)
+  for (i in seq_len(n_draws)) {
+    for (h in seq_len(H)) {
+      forecast[[i]][, h] <- t(L) %*% z[[i]][, h] + rnorm(D, 0, sigma_e)
+    }
   }
   
   forecast
