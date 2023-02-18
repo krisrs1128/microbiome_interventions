@@ -36,6 +36,17 @@ multi_subset <- function(x, i, j, ..., drop = FALSE) {
   new("ts_inter", series = result)
 }
 
+transfer_predict <- function(object, newdata) {
+  result <- list()
+  if (object@method == "zeros") {
+    result <- zeros_predict(newdata)
+  } else if (object@method == "gaussian_latent") {
+    
+  }
+  
+  result
+}
+
 setMethod("length", "ts_inter", function(x) length(x@series))
 setMethod("nrow", "ts_inter_single", function(x) nrow(x@values))
 setMethod("ncol", "ts_inter_single", function(x) ncol(x@values))
@@ -47,10 +58,15 @@ setMethod("[", c("ts_inter", "numeric", "missing", "ANY"), function(x, i, j, ...
 setMethod("[[", c("ts_inter", "numeric", "missing"), function(x, i, j, ...) x@series[[i]])
 setMethod("[", c("ts_inter", "logical", "missing", "ANY"), function(x, i, j, ..., drop=TRUE) initialize(x, series=x@series[i]))
 setMethod("[[", c("ts_inter", "logical", "missing"), function(x, i, j, ...) x@series[[i]])
-#setMethod("predict",  c(object = "transfer_model"), transfer_predict)
 
+#' @export
+setMethod("predict",  c(object = "transfer_model"), transfer_predict)
+
+#' @export
 setGeneric("values", function(x) standardGeneric("values"))
 setMethod("values", "ts_inter_single", function(x) x@values)
+
+#' @export
 setGeneric("values<-", function(x, values) standardGeneric("values<-"))
 setMethod("values<-", "ts_inter_single", function(x, values) {
   x@values <- values
@@ -62,11 +78,14 @@ setMethod("[[<-", "ts_inter", function(x, i, j, value) {
   x
 })
 
+#' @export
 setGeneric("interventions", function(x) standardGeneric("interventions"))
 setMethod("interventions", "ts_inter_single", function(x) x@interventions)
-setGeneric("interventions<-", function(x, interventions) standardGeneric("interventions<-"))
-setMethod("interventions<-", "ts_inter_single", function(x, interventions) {
-  x@interventions <- interventions
+
+#' @export
+setGeneric("interventions<-", function(x, value) standardGeneric("interventions<-"))
+setMethod("interventions<-", "ts_inter_single", function(x, value) {
+  x@interventions <- value
   x
 })
 

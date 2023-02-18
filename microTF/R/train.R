@@ -23,3 +23,11 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
   
   result
 }
+
+zeros_predict <- function(newdata) {
+  for (i in seq_along(newdata)) {
+    preds <- matrix(0, nrow(newdata[[i]]), ncol(newdata[[i]]@interventions) - ncol(newdata[[i]]))
+    values(newdata[[i]]) <- cbind(values(newdata[[i]]), preds)
+  }
+  newdata
+}

@@ -36,9 +36,10 @@ evaluation <- function(y, y_hat, window = 10) {
   bind_rows(avg_err, .id = "subject")
 }
 
+#' @importFrom magrittr %>%
 #' @importFrom dplyr bind_rows
 #' @export
-cross_validate <- function(ts_inter, train, n_ahead = 1, K = 5, n_reps = 5) {
+cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, t_start = 5) {
   N <- length(ts_inter)
 
   fits <- list()
@@ -48,7 +49,16 @@ cross_validate <- function(ts_inter, train, n_ahead = 1, K = 5, n_reps = 5) {
   for (k in seq_len(K)) {
     splits <- train_test_split(ts_inter, 1 / K)
     fits[[k]] <- train(splits$train)
-    y_hat[[k]] <- predict(fits[[k]], splits$test, n_ahead)
+    y_hat_k <- list()
+    metrics_k <- list()
+
+    stest <- splits$test
+    for (i in seq_along(splits$test)) {
+      values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
+      interventions(stest[[i]]) <- interventions(stest[[i]])[, seq_len(t_start + n_ahead), drop = FALSE]
+    }
+    
+    y_hat[[k]] <- predict(fits[[k]], stest)
     metrics[[k]] <- evaluation(splits$test, y_hat[[k]], k)
   }
   
