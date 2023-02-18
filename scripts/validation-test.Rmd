@@ -20,7 +20,7 @@ for (i in seq_len(50)) {
     "ts_inter_single", 
     values = matrix(rnorm(20), 2, 10), 
     time = 1:10, 
-    interventions = matrix(c(0, 1), 1, 5)
+    interventions = matrix(c(0, 1), 1, 10)
   )
 }
 
@@ -29,8 +29,24 @@ length(obj)
 obj[1:2]
 ```
 
+Here we manually hold out the last half of the timepoitns for half the people
+and ask for predictions.
+
 ```{r}
-fit <- train(obj)
-y_hat <- predict(fit, newdata = obj)
+fit <- train(obj[1:25])
+values(obj[[1]]) <- matrix(1:10, 1, 10)
+interventions(obj[[2]]) <- matrix(10:1, 1, 10)
+
+# hide the last half of each test object
+test <- obj
+for (i in seq(26, 50)) {
+  values(test[[i]]) <- values(test[[i]])[, 1:5, drop = F]
+}
+y_hat <- predict(fit, newdata = test)
+```
+
+Alternatively, we can use cross-validation to compute errors across many folds.
+
+```{r}
 cross_validate(obj, train)$metrics
 ```
