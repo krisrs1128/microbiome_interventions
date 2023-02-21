@@ -41,7 +41,7 @@ transfer_predict <- function(object, newdata) {
   if (object@method == "zeros") {
     result <- zeros_predict(newdata)
   } else if (object@method == "gaussian_latent") {
-    
+    result <- gaussian_latent_predict(object, newdata)
   }
   
   result

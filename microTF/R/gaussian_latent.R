@@ -62,9 +62,25 @@ gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species =
 }
 
 #' @export
-gaussian_latent_predict <- function(ts_inter, interventions, params) {
+gaussian_latent_predict <- function(obj, newdata) {
+  for (i in seq_along(newdata)) {
+    new_ix <- seq(ncol(newdata[[i]]), ncol(newdata[[i]]@interventions))
+    full_interventions <- interventions(newdata[[i]])
+    future_interventions <- full_interventions[, new_ix, drop = FALSE]
+    interventions(newdata[[i]]) <- full_interventions[, seq_len(ncol(newdata[[i]])), drop = FALSE]
+
+    y_dist <- gaussian_latent_predict_(newdata[[i]], future_interventions, obj@parameters)
+    y_mean <- apply(simplify2array(y_dist$x), 1:2, mean)
+    values(newdata[[i]]) <- cbind(values(newdata[[i]]), y_mean)
+    interventions(newdata[[i]]) <- full_interventions
+  }
+  newdata
+}
+
+#' @export
+gaussian_latent_predict_ <- function(ts_inter, interventions, params) {
   params <- summarize_posterior(params)
-  z_past <- gaussian_infer_latent(ts_inter@values, ts_inter@interventions, params)
+  z_past <- gaussian_infer_latent(values(ts_inter), interventions(ts_inter), params)
 
   interventions <- cbind(ts_inter@interventions, interventions)
   z <- gaussian_forecast_latent(z_past, interventions, params$A, params$B, params$sigma_z)
@@ -107,7 +123,7 @@ gaussian_forecast_latent <- function(z, interventions, A, B, sigma_z) {
 
 gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z) {
   K <- nrow(zi)
-  H <- ncol(interventions) - ncol(zi)
+  H <- ncol(interventions) - ncol(zi) - 1
   forecast <- cbind(zi, matrix(0, K, H))
   n_obs <- ncol(zi)
   
@@ -121,7 +137,7 @@ gaussian_forecast_latent_ <- function(zi, interventions, A, B, sigma_z) {
     forecast[, n_obs + h] <- forecast[, n_obs + h] + rnorm(K, 0, sigma_z)
   }
 
-  forecast[, -c(1:n_obs)]
+  forecast[, -seq_len(n_obs), drop = FALSE]
 }
 
 #' @export

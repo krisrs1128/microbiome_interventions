@@ -21,7 +21,7 @@ pivot_list <- function(x, var1, var2) {
     split(.$P, ~ pivot_wider(names_from = any_of(var1), values_from = mean)) %>%
     map(~ select(., -P)) %>%
     map(~ pivot_wider(., names_from = any_of(var2), values_from = mean)) %>%
-    map(~ select(., -var1)) %>%
+    map(~ select(., -any_of(var1))) %>%
     map(~ as.matrix(.))
 }
 
