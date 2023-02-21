@@ -64,16 +64,19 @@ gaussian_latent_ensemble <- function(interventions, n_subjects = 10, n_species =
 #' @export
 gaussian_latent_predict <- function(obj, newdata) {
   for (i in seq_along(newdata)) {
+    # manipulate interventions data to specify past vs. future
     new_ix <- seq(ncol(newdata[[i]]), ncol(newdata[[i]]@interventions))
     full_interventions <- interventions(newdata[[i]])
     future_interventions <- full_interventions[, new_ix, drop = FALSE]
     interventions(newdata[[i]]) <- full_interventions[, seq_len(ncol(newdata[[i]])), drop = FALSE]
 
+    # get distributional predictions and then simplify to posterior mean
     y_dist <- gaussian_latent_predict_(newdata[[i]], future_interventions, obj@parameters)
     y_mean <- apply(simplify2array(y_dist$x), 1:2, mean)
     values(newdata[[i]]) <- cbind(values(newdata[[i]]), y_mean)
     interventions(newdata[[i]]) <- full_interventions
   }
+
   newdata
 }
 

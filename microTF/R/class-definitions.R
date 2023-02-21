@@ -88,4 +88,3 @@ setMethod("interventions<-", "ts_inter_single", function(x, value) {
   x@interventions <- value
   x
 })
-
