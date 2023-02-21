@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
-data_dir <- path("../microbiome_transfer_data/hospitalome/")
+data_dir <- path("../../microbiome_transfer_data/hospitalome/")
 ```
 
 ## Figure 1
@@ -93,5 +93,32 @@ genera <- genera %>%
 ggplot(genera) +
   geom_col(aes(DayRelativeToNearestHCT, proportion, fill = Genus_group, col = Genus_group)) +
   xlim(-5, 20)
+```
+
+An example of interpolating the series for one person onto an even grid of
+timepoints. First, we'll construct a `ts_inter` object over which to
+interpolate.
+
+```{r}
+values <- genera %>%
+  ungroup() %>%
+  select(DayRelativeToNearestHCT, Genus, Count) %>%
+  pivot_wider(names_from = DayRelativeToNearestHCT, values_from = Count, values_fill = 0) %>%
+  filter(Genus != "<not present>") %>%
+  column_to_rownames("Genus") %>%
+  as.matrix()
+
+time <- as.numeric(colnames(values))
+interventions <- matrix(0, 1, ncol(values)) # need to fill this in
+obj <- new("ts_inter_single", values = values, interventions = interventions, time = time)[, 1:13]
+obj <- new("ts_inter", series = list(obj))
+```
+
+Now we'll interpolate and plot the difference.
+
+```{r}
+obj2 <- interpolate(obj)
+plot(obj[[1]]@time, values(obj[[1]])[9, ])
+plot(values(obj2[[1]])[9, ])
 ```
 
