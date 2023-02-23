@@ -1,0 +1,50 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(reticulate)
+library(fs)
+theme_set(theme_bw())
+use_condaenv("~/miniconda3/envs/mdsine2")
+```
+
+There might actually be some value in supporting a testing procedure. The
+intervention effects are clear for some taxa, but certainly do not seem
+universal.
+
+```{r}
+data_dir <- path("../../microbiome_transfer_data/david")
+abundances <- read_csv(data_dir / "abundance.csv") %>%
+  rename(sample = `...1`)
+samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "group", "time")) %>%
+  mutate(intervention = str_extract(group, "[A-z]+"))
+subject <- read_csv(data_dir / "subject_data.csv")
+taxonomy <- read_csv(data_dir / "taxaTable.csv")
+```
+
+```{r, fig.width = 20, fig.height = 7.5}
+x_sub <- abundances[, 1:26] %>%
+  pivot_longer(-sample, names_to = "taxon") %>%
+  group_by(sample) %>%
+  mutate(value = value / sum(value)) %>%
+  group_by(taxon) %>%
+  mutate(group_max = max(value)) %>%
+  left_join(samples)
+
+ggplot(x_sub, aes(time, value, col = intervention)) +
+  geom_rect(aes(xmin = 0, ymin = 0, xmax = 5, ymax = group_max), fill = "#D9D9D9", col = NA, alpha = 0.2) +
+  geom_line(aes(group = group), alpha = 0.8) +
+  stat_smooth(se = FALSE, size = 2) +
+  scale_color_manual(values = c("#D99066", "#358C6C")) +
+  scale_y_sqrt() +
+  facet_wrap(~ reorder(taxon, value), scales = "free_y", ncol = 5)
+```
+
