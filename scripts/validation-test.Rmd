@@ -29,7 +29,7 @@ length(obj)
 obj[1:2]
 ```
 
-Here we manually hold out the last half of the timepoitns for half the people
+Here we manually hold out the last half of the timepoints for half the people
 and ask for predictions.
 
 ```{r}
@@ -51,6 +51,7 @@ Alternatively, we can use cross-validation to compute errors across many folds.
 cross_validate(obj, train)$metrics
 ```
 
+
 ```{r}
 hyper <- list(P = 1, Q = 1, K = 2)
 fit <- train(obj[1], "gaussian_latent", hyper)
@@ -60,6 +61,6 @@ tr <- function(x) {
   train(x, "gaussian_latent", hyper)
 }
 
-cross_validate(obj, tr)$metrics
+#cross_validate(obj, tr)$metrics
 ```
 

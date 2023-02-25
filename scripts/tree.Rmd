@@ -1,0 +1,61 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+```{r}
+library(microTF)
+library(tidyverse)
+library(tidymodels)
+library(caret)
+```
+
+
+```{r}
+n_subjects <- 100
+n_timepoints <- 25
+interventions <- matrix(0, 1, n_timepoints)
+L <- microTF:::sparse_normal(5, 1)
+A <- list(matrix(0.8, 1, 1))
+B <- list(matrix(0, 1, 1), matrix(0, 1, 1), matrix(0.8, 1, 1))
+params <- list(A = A, B = B, L = L)
+
+series <- list()
+for (i in seq_len(n_subjects)) {
+  interventions_ <- interventions
+  interventions_[1, sample(n_timepoints, 1)] <- 1
+  sim <- gaussian_latent(interventions_, params, 0, 0.05)
+  series[[i]] <- new(
+    "ts_inter_single", 
+    values = sim$x,
+    time = seq_len(ncol(interventions)),
+    interventions = interventions_
+  )
+}
+
+result <- new("ts_inter", series = series)
+```
+
+```{r}
+for (i in seq_len(5)) {
+  plot(values(result[[i]])[1, ])
+}
+```
+
+```{r}
+patches <- patchify(result, 3)
+x <- pivot_ts(patches$x, TRUE)
+y <- pivot_ts(patches$y, FALSE)
+fit1 <- train(select(x, -patch), pull(y, taxon1_time1), method = "gbm", verbose = FALSE)
+```
+
+```{r}
+y_hat <- predict(fit1, select(x, -patch))
+plot(pull(y, taxon1_time1), y_hat)
+abline(a = 0, b = 1, col = "red")
+```
+
