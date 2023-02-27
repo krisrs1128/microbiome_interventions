@@ -46,16 +46,29 @@ for (i in seq_len(5)) {
 }
 ```
 
-```{r}
-patches <- patchify(result, 3)
-x <- pivot_ts(patches$x, TRUE)
-y <- pivot_ts(patches$y, FALSE)
-fit1 <- train(select(x, -patch), pull(y, taxon1_time1), method = "gbm", verbose = FALSE)
-```
 
 ```{r}
-y_hat <- predict(fit1, select(x, -patch))
-plot(pull(y, taxon1_time1), y_hat)
+train_data <- patchify_df(result, p = 2, q = 3)
+fit <- list()
+for (j in seq_along(train_data$y)) {
+  print(glue::glue("taxon {j}/{ncol(train_data$y)}"))
+  fit[[j]] <- train(train_data$x, train_data$y[[j]], method = "gbm", verbose = FALSE)
+}
+```
+
+Predictions on training data for just one taxon.
+
+```{r}
+y_hat <- predict(fit[[1]], train_data$x)
+plot(train_data$y[[1]], y_hat)
 abline(a = 0, b = 1, col = "red")
 ```
 
+Get predictions for all taxa in future interventions. Cannot compare with truth,
+since no holdout. First 25 timepoints are observed, the next 10 are forecast.
+
+```{r}
+new_interventions <- matrix(0, 1, 3)
+y_hat <- tree_predict(fit, result, matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 1))
+plot(values(y_hat[[1]])[1, ])
+```
