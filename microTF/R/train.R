@@ -1,11 +1,12 @@
 
-#' importFrom cmdstanr cmdstan_model
+#' @importFrom cmdstanr cmdstan_model
+#' @importFrom gbm gbm
 #' @export
 train <- function(ts_inter, method = "zeros", hyper = list()) {
   if (method == "zeros") {
     result <- new("transfer_model", parameters = list(), method = method)
-  }
-  if (method == "gaussian_latent") {
+  } else if (method == "gaussian_latent") {
+
     model <- cmdstan_model(system.file("gaussian_latent.stan", package = "microTF"))
     data_list <- list(
       x = ts_inter[[1]]@values,
@@ -19,6 +20,16 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
     )
     fit <- model$variational(data_list)
     result <- new("transfer_model", parameters = fit, method = method)
+
+  } else if(method == "gbm") {
+
+    train_data <- patchify_df(ts_inter)
+    fit <- list()
+    for (j in seq_along(train_data$y)) {
+      fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), "gaussian")
+    }
+    result <- new("transfer_model", parameters = fit, method = method)
+    
   }
   
   result

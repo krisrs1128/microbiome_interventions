@@ -28,6 +28,7 @@ patchify_single <- function(ts_inter, p = 2, q = 3) {
   data
 }
 
+#' @importFrom stringr str_c
 patchify_single_df <- function(ts_inter) {
   data <- patchify_single(ts_inter)
   x <- data$x
@@ -51,6 +52,8 @@ patchify_single_df <- function(ts_inter) {
   result
 }
 
+#' @importFrom purrr map_dfr
+#' @export
 patchify_df <- function(ts_inter, p = 2, q = 3) {
   patches <- list()
   for (i in seq_along(ts_inter)) {
@@ -72,27 +75,6 @@ predictor_names <- function(x_dim, z_dim) {
   z_names <- str_c(n1, "_", n2)
   
   c(x_names, z_names)
-}
-
-tree_predict <- function(fit, ts_inter, new_interventions) {
-  lags <- time_lags(fit[[1]])  
-  if (!is.list(new_interventions)) {
-    new_interventions <- replicate(length(ts_inter), new_interventions, simplify = FALSE)
-  }
-  
-  result <- list()
-  for (i in seq_along(ts_inter)) {
-    result[[i]] <- tree_predict_(fit, ts_inter[[i]], new_interventions[[i]], lags)
-  }
-  
-  new("ts_inter", series = result)
-}
-
-tree_predict_ <- function(fit, ts_inter, new_interventions, lags) {
-  for (h in seq_len(ncol(new_interventions))) {
-    ts_inter <- tree_predict_step(ts_inter, fit, new_interventions[, h, drop = FALSE], lags)
-  }
-  ts_inter
 }
 
 lag_from_names <- function(names, group = "taxon") {
@@ -119,17 +101,4 @@ predictors <- function(ts_inter, z_next, lags) {
   cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) %>%
     as.data.frame() %>%
     set_names(predictor_names(dim(x_prev), dim(z_prev)))
-}
-
-tree_predict_step <- function(ts_inter, fit, z_next, lags) {
-  xz <- predictors(ts_inter, z_next, lags)
-  y_hat <- vector(length = nrow(ts_inter))
-  for (j in seq_len(nrow(ts_inter))) {
-    y_hat[j] <- predict(fit[[j]], xz)
-  }
-
-  values(ts_inter) <- cbind(values(ts_inter), y_hat)
-  ts_inter@time <- c(ts_inter@time, max(ts_inter@time) + 1)
-  interventions(ts_inter) <- cbind(interventions(ts_inter), z_next)
-  ts_inter
 }

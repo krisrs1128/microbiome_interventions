@@ -80,13 +80,7 @@ predictions.
 ```{r}
 K <- 5
 splits <- train_test_split(result, 1 / K)
-
-train_data <- patchify_df(splits$train)
-fit <- list()
-for (j in seq_along(train_data$y)) {
-  print(glue::glue("taxon {j}/{ncol(train_data$y)}"))
-  fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), distribution = "gaussian")
-}
+train(splits$train, "gbm")
 ```
 
 ```{r}
@@ -98,12 +92,12 @@ stest <- splits$test
 new_interventions <- list()
 for (i in seq_along(splits$test)) {
   values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
-  inter <- interventions(stest[[i]])
-  interventions(stest[[i]]) <- inter[, seq_len(t_start), drop = FALSE]
-  new_interventions[[i]] <- inter[, seq(t_start + 1, t_start + n_ahead), drop = FALSE]
+  #inter <- interventions(stest[[i]])
+  #interventions(stest[[i]]) <- inter[, seq_len(t_start), drop = FALSE]
+  #new_interventions[[i]] <- inter[, seq(t_start + 1, t_start + n_ahead), drop = FALSE]
 }
 
-y_hat <- tree_predict(fit, stest, new_interventions)
+y_hat <- predict(fit, stest)
 ```
 
 ```{r}
@@ -112,5 +106,3 @@ for (ix in seq_along(y_hat)) {
   points(values(splits$test[[ix]])[1, ], col = "black")
 }
 ```
-
-
