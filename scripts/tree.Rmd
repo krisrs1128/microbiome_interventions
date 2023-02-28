@@ -10,16 +10,15 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```{r}
 library(microTF)
 library(tidyverse)
-library(tidymodels)
-library(caret)
+library(gbm)
+theme_set(theme_bw())
 ```
-
 
 ```{r}
 n_subjects <- 100
 n_timepoints <- 50
 interventions <- matrix(0, 1, n_timepoints)
-L <- microTF:::sparse_normal(5, 1)
+L <- microTF:::sparse_normal(5, 1, s = 0)
 A <- list(matrix(0.8, 1, 1))
 B <- list(matrix(0, 1, 1), matrix(0, 1, 1), matrix(0.8, 1, 1))
 params <- list(A = A, B = B, L = L)
@@ -48,18 +47,10 @@ for (i in seq_len(5)) {
 
 
 ```{r}
+fit <- train(result, method = "gbm")
+
 train_data <- patchify_df(result, p = 1, q = 4)
-fit <- list()
-for (j in seq_along(train_data$y)) {
-  print(glue::glue("taxon {j}/{ncol(train_data$y)}"))
-  fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), distribution = "gaussian")
-}
-```
-
-Predictions on training data for just one taxon.
-
-```{r}
-y_hat <- predict(fit[[1]], train_data$x)
+y_hat <- predict(fit@parameters[[1]], train_data$x)
 plot(train_data$y[[1]], y_hat)
 abline(a = 0, b = 1, col = "red")
 ```
@@ -69,7 +60,7 @@ since no holdout. First 25 timepoints are observed, the next 10 are forecast.
 
 ```{r}
 new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 1)
-y_hat <- tree_predict(fit, result, new_interventions)
+y_hat <- gbm_predict_(fit@parameters, result, new_interventions)
 plot(values(y_hat[[2]])[1, ])
 ```
 
@@ -80,7 +71,7 @@ predictions.
 ```{r}
 K <- 5
 splits <- train_test_split(result, 1 / K)
-train(splits$train, "gbm")
+fit <- train(splits$train, "gbm")
 ```
 
 ```{r}
@@ -92,17 +83,52 @@ stest <- splits$test
 new_interventions <- list()
 for (i in seq_along(splits$test)) {
   values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
-  #inter <- interventions(stest[[i]])
-  #interventions(stest[[i]]) <- inter[, seq_len(t_start), drop = FALSE]
-  #new_interventions[[i]] <- inter[, seq(t_start + 1, t_start + n_ahead), drop = FALSE]
 }
 
 y_hat <- predict(fit, stest)
 ```
 
 ```{r}
-for (ix in seq_along(y_hat)) {
-  plot(values(y_hat[[ix]])[1, ], col = "red")
-  points(values(splits$test[[ix]])[1, ], col = "black")
+compare_data <- list()
+for (i in seq_along(y_hat)) {
+  compare_data[[i]] <- tibble(
+    time = seq_len(ncol(y_hat[[i]])),
+    subject = i
+  ) %>%
+    bind_cols(
+      as_tibble(t(values(y_hat[[i]]))) %>%
+        set_names(str_c("y_hat", seq_len(nrow(y_hat[[i]]))))
+    ) %>%
+    bind_cols(
+      as_tibble(t(values(splits$test[[i]]))) %>%
+        set_names(str_c("y", seq_len(nrow(y_hat[[i]]))))
+    ) %>%
+    pivot_longer(-c("time", "subject")) %>%
+    mutate(
+      taxon = str_extract(name, "[0-9]+"),
+      type = str_remove(name, "[0-9]+")
+    )
 }
+
+compare_data <- bind_rows(compare_data) %>%
+  filter(!(time <= t_start & type == "y_hat"))
+```
+
+```{r, fig.width = 10, fig.height = 10}
+ggplot(
+  compare_data %>% filter(subject < 10),
+  aes(time, value, col = type)
+  ) +
+  geom_point() +
+  geom_line(aes(group = subject)) +
+  facet_grid(subject ~ reorder(taxon, value), scales = "free_y") +
+  scale_color_manual(values = c("#5C51A6", "#8C1C03"))
+```
+
+```{r}
+ggplot(compare_data) +
+  geom_tile(aes(time, reorder(subject, value), fill = value)) +
+  facet_grid(reorder(taxon, value) ~ type) +
+  scale_fill_gradient2() +
+  scale_x_continuous(expand = c(0, 0), limits = c(30, 50))
 ```

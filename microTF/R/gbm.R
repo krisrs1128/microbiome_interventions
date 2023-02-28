@@ -8,12 +8,12 @@ gbm_predict <- function(object, newdata) {
     t1 <- ncol(newdata[[i]])   
     t2 <- ncol(interventions(newdata[[i]]))
     
-    series[[i]] <- ts_inter[[i]][, seq_len(t1)]
-    new_interventions[[i]] <- interventions(newdata[[i]])[, seq(t1 + 1, t2)]
+    series[[i]] <- newdata[[i]][, seq_len(t1)]
+    new_interventions[[i]] <- interventions(newdata[[i]])[, seq(t1 + 1, t2), drop = FALSE]
   }
   
-  ts_inter <- new("ts_inter", series = series)
-  gbm_predict_(fit, ts_inter, new_interventions)
+  newdata <- new("ts_inter", series = series)
+  gbm_predict_(fit, newdata, new_interventions)
 }
 
 #' @export
