@@ -52,21 +52,41 @@ ggplot(x_sub, aes(time, value, col = intervention)) +
 ```
 
 ```{r}
+# mdsine crashes if 0 is not one of the measured timepoints
+subjects <- unique(samples$group)
+for (i in seq_along(subjects)) {
+  current_times <- samples %>%
+    filter(group == subjects[i]) %>%
+    pull(time)
+  
+  if (!(0 %in% current_times)) {
+    replace_ix <- max(which(samples$group == subjects[i] & samples$time <= 0))
+    samples$time[replace_ix] <- 0
+  }
+}
+
 metadata <- samples %>%
   rename(sampleID = sample, subject = group) %>%
   select(-intervention)
 
 qpcr <- metadata %>%
-  mutate(measurement1 = 1e9) %>%
-  select(sampleID, measurement1)
-
-perturbations <- subject %>%
   mutate(
-    start = 0, end = 5
+    measurement1 = rnorm(nrow(metadata), 1e9, 1e3), 
+    measurement2 = rnorm(nrow(metadata), 1e9, 1e3), 
+    measurement3 = rnorm(nrow(metadata), 1e9, 1e3)
   ) %>%
-  rename(subject = subject_ID, name = diet)
+  select(sampleID, measurement1:measurement3)
+
+perturbations <- samples %>%
+  group_by(group) %>%
+  mutate(
+    start = min(time[time <= 0]),
+    end = min(time[time >= 5]),
+  ) %>%
+  rename(subject = group, name = intervention)
 
 reads <- abundances %>%
+  filter(sample %in% metadata$sampleID) %>%
   pivot_longer(-sample, names_to = "name") %>%
   pivot_wider(names_from = "sample")
 
@@ -86,39 +106,4 @@ write_tsv(qpcr, "qpcr.tsv")
 write_tsv(perturbations, "perturbations.tsv")
 write_tsv(reads, "reads.tsv")
 write_tsv(taxonomy, "taxonomy.tsv")
-```
-
-```{python}
-import mdsine2 as md2
-import pandas as pd
-import numpy as np
-
-# set negative binomial model inference parameters
-params = md2.config.NegBinConfig(
-  seed=0, burnin=100, n_samples=200,
-  checkpoint=100, 
-  basepath=str("./negbin")
-)
-
-dataset = md2.dataset.parse(
-  name="david-diet", 
-  taxonomy="taxonomy.tsv",  
-  reads="reads.tsv", 
-  qpcr="qpcr.tsv", 
-  metadata="metadata.tsv"
-)
-
-mcmc_negbin = md2.negbin.build_graph(
-  params=params, 
-  graph_name=dataset.name,
-  subjset=dataset
-)
-```
-
-```{python}
-mcmc_negbin = md2.negbin.run_graph(
-    mcmc_negbin, 
-    crash_if_error=True
-)
-mcmc_negbin
 ```
