@@ -17,7 +17,7 @@ library(caret)
 
 ```{r}
 n_subjects <- 100
-n_timepoints <- 25
+n_timepoints <- 50
 interventions <- matrix(0, 1, n_timepoints)
 L <- microTF:::sparse_normal(5, 1)
 A <- list(matrix(0.8, 1, 1))
@@ -27,7 +27,7 @@ params <- list(A = A, B = B, L = L)
 series <- list()
 for (i in seq_len(n_subjects)) {
   interventions_ <- interventions
-  interventions_[1, sample(n_timepoints, 1)] <- 1
+  interventions_[1, sample(n_timepoints - 4, 2)] <- 1
   sim <- gaussian_latent(interventions_, params, 0, 0.05)
   series[[i]] <- new(
     "ts_inter_single", 
@@ -48,11 +48,11 @@ for (i in seq_len(5)) {
 
 
 ```{r}
-train_data <- patchify_df(result, p = 2, q = 3)
+train_data <- patchify_df(result, p = 1, q = 4)
 fit <- list()
 for (j in seq_along(train_data$y)) {
   print(glue::glue("taxon {j}/{ncol(train_data$y)}"))
-  fit[[j]] <- train(train_data$x, train_data$y[[j]], method = "gbm", verbose = FALSE)
+  fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), distribution = "gaussian")
 }
 ```
 
@@ -68,7 +68,49 @@ Get predictions for all taxa in future interventions. Cannot compare with truth,
 since no holdout. First 25 timepoints are observed, the next 10 are forecast.
 
 ```{r}
-new_interventions <- matrix(0, 1, 3)
-y_hat <- tree_predict(fit, result, matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 1))
-plot(values(y_hat[[1]])[1, ])
+new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 1)
+y_hat <- tree_predict(fit, result, new_interventions)
+plot(values(y_hat[[2]])[1, ])
 ```
+
+Let's next consider actually holding out some examples and looking at
+predictions.
+
+
+```{r}
+K <- 5
+splits <- train_test_split(result, 1 / K)
+
+train_data <- patchify_df(splits$train)
+fit <- list()
+for (j in seq_along(train_data$y)) {
+  print(glue::glue("taxon {j}/{ncol(train_data$y)}"))
+  fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), distribution = "gaussian")
+}
+```
+
+```{r}
+t_start <- 30
+n_ahead <- 20
+
+# hide the second half of each test sample
+stest <- splits$test
+new_interventions <- list()
+for (i in seq_along(splits$test)) {
+  values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
+  inter <- interventions(stest[[i]])
+  interventions(stest[[i]]) <- inter[, seq_len(t_start), drop = FALSE]
+  new_interventions[[i]] <- inter[, seq(t_start + 1, t_start + n_ahead), drop = FALSE]
+}
+
+y_hat <- tree_predict(fit, stest, new_interventions)
+```
+
+```{r}
+for (ix in seq_along(y_hat)) {
+  plot(values(y_hat[[ix]])[1, ], col = "red")
+  points(values(splits$test[[ix]])[1, ], col = "black")
+}
+```
+
+

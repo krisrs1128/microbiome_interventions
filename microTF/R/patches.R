@@ -76,9 +76,13 @@ predictor_names <- function(x_dim, z_dim) {
 
 tree_predict <- function(fit, ts_inter, new_interventions) {
   lags <- time_lags(fit[[1]])  
+  if (!is.list(new_interventions)) {
+    new_interventions <- replicate(length(ts_inter), new_interventions, simplify = FALSE)
+  }
+  
   result <- list()
   for (i in seq_along(ts_inter)) {
-    result[[i]] <- tree_predict_(fit, ts_inter[[i]], new_interventions, lags)
+    result[[i]] <- tree_predict_(fit, ts_inter[[i]], new_interventions[[i]], lags)
   }
   
   new("ts_inter", series = result)
@@ -100,12 +104,9 @@ lag_from_names <- function(names, group = "taxon") {
 }
 
 time_lags <- function(fit) {
-  inputs <- fit$trainingData %>%
-    select(-.outcome) %>%
-    colnames()
-  
+  inputs <- fit$var.names
   P <- lag_from_names(inputs, "taxon")
-  Q <- lag_from_names(inputs, "intervention")
+  Q <- lag_from_names(inputs, "intervention") + 1
   c(P, Q)
 }
 
@@ -115,9 +116,9 @@ predictors <- function(ts_inter, z_next, lags) {
   x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
   z_prev <- cbind(z[, seq(ncol(z) - lags[2] + 2, ncol(z)), drop = FALSE], z_next)
   
-  predictors <- cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1))
-  colnames(predictors) <- predictor_names(dim(x_prev), dim(z_prev))
-  predictors
+  cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) %>%
+    as.data.frame() %>%
+    set_names(predictor_names(dim(x_prev), dim(z_prev)))
 }
 
 tree_predict_step <- function(ts_inter, fit, z_next, lags) {
