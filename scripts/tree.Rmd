@@ -89,46 +89,49 @@ y_hat <- predict(fit, stest)
 ```
 
 ```{r}
-compare_data <- list()
-for (i in seq_along(y_hat)) {
-  compare_data[[i]] <- tibble(
-    time = seq_len(ncol(y_hat[[i]])),
-    subject = i
-  ) %>%
-    bind_cols(
-      as_tibble(t(values(y_hat[[i]]))) %>%
-        set_names(str_c("y_hat", seq_len(nrow(y_hat[[i]]))))
-    ) %>%
-    bind_cols(
-      as_tibble(t(values(splits$test[[i]]))) %>%
-        set_names(str_c("y", seq_len(nrow(y_hat[[i]]))))
-    ) %>%
-    pivot_longer(-c("time", "subject")) %>%
-    mutate(
-      taxon = str_extract(name, "[0-9]+"),
-      type = str_remove(name, "[0-9]+")
-    )
-}
+y_hat_df <- tidy_ts(y_hat)$x %>%
+  rename(prediction = value)
+y_df <- tidy_ts(stest)
+```
 
-compare_data <- bind_rows(compare_data) %>%
+
+
+
+
+```{r}
+compare_df <- y_hat_df %>%
+  left_join(rename(y_df$z, indicator = value)) %>%
+  left_join(y_df$x) %>%
+  pivot_longer(c("prediction", "value"), names_to = "type") %>%
   filter(!(time <= t_start & type == "y_hat"))
 ```
 
-```{r, fig.width = 10, fig.height = 10}
+```{r, fig.width = 10, fig.height = 5}
 ggplot(
-  compare_data %>% filter(subject < 10),
+  compare_df %>% filter(as.numeric(subject) < 6),
   aes(time, value, col = type)
   ) +
   geom_point() +
-  geom_line(aes(group = subject)) +
+  geom_vline(data = compare_df %>% filter(as.numeric(subject) < 6, indicator == 1), aes(xintercept = time)) +
   facet_grid(subject ~ reorder(taxon, value), scales = "free_y") +
   scale_color_manual(values = c("#5C51A6", "#8C1C03"))
 ```
 
 ```{r}
-ggplot(compare_data) +
-  geom_tile(aes(time, reorder(subject, value), fill = value)) +
+ggplot(compare_df, aes(time, reorder(subject, value))) +
+  geom_tile(aes(fill = value)) +
+  geom_point(data = compare_df %>% filter(indicator == 1), size = 0.4) +
   facet_grid(reorder(taxon, value) ~ type) +
   scale_fill_gradient2() +
-  scale_x_continuous(expand = c(0, 0), limits = c(30, 50))
+  scale_x_continuous(expand = c(0, 0))
 ```
+
+```{r}
+train_fun <- function(x) {
+  train(x, method = "gbm")
+}
+
+validation <- cross_validate(result, train_fun)
+validation$metrics
+```
+

@@ -20,16 +20,15 @@ post_intervention <- function(interventions, window) {
 
 #' @importFrom dplyr bind_rows
 #' @export
-evaluation <- function(y, y_hat, window = 10) {
+evaluation <- function(y, y_hat, test_ix, window = 10) {
   residuals <- list()
   avg_err <- list()
   
   for (i in seq_along(y)) {
-    residuals[[i]]<- y[[i]]@values - y_hat[[i]]@values
-    time_window <- post_intervention(y[[i]]@interventions, window)
+    residuals[[i]]<- values(y[[i]][, test_ix]) - values(y_hat[[i]][, test_ix])
     avg_err[[i]] <- data.frame(
-      mse = mean(residuals[[i]][, time_window] ^ 2),
-      mae = mean(abs(residuals[[i]][, time_window]))
+      mse = mean(residuals[[i]] ^ 2),
+      mae = mean(abs(residuals[[i]]))
     )
   }
   
@@ -49,8 +48,6 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, t_start = 5) {
   for (k in seq_len(K)) {
     splits <- train_test_split(ts_inter, 1 / K)
     fits[[k]] <- train(splits$train)
-    y_hat_k <- list()
-    metrics_k <- list()
 
     stest <- splits$test
     for (i in seq_along(splits$test)) {
@@ -59,7 +56,8 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, t_start = 5) {
     }
     
     y_hat[[k]] <- predict(fits[[k]], stest)
-    metrics[[k]] <- evaluation(splits$test, y_hat[[k]], k)
+    test_ix <- seq(t_start, t_start + n_ahead)
+    metrics[[k]] <- evaluation(splits$test, y_hat[[k]], test_ix, k)
   }
   
   metrics <- bind_rows(metrics, .id = "fold")
