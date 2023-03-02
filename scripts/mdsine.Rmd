@@ -78,13 +78,32 @@ qpcr <- metadata %>%
   select(sampleID, measurement1:measurement3)
 
 perturbations <- samples %>%
-  group_by(group) %>%
-  mutate(
-    start = min(time[time <= 0]),
-    end = min(time[time >= 5]),
+  group_by(group, intervention) %>%
+  summarise(
+    start = max(time[time <= 0]),
+    end = min(time[time >= 5])
   ) %>%
   rename(subject = group, name = intervention)
 
+subject_ids <- samples %>%
+  pull(group) %>%
+  unique()
+perturbation_ids <- samples %>%
+  pull(intervention) %>%
+  unique()
+perturbation_pad <- expand.grid(subject_ids, perturbation_ids) %>%
+  mutate(
+    start = 0,
+    end = 1 
+  ) %>%
+  rename(name = Var2, subject = Var1) %>%
+  filter(!str_detect(subject, as.character(name)))
+
+perturbations <- bind_rows(perturbations, perturbation_pad)
+```
+
+
+```{r}
 reads <- abundances %>%
   filter(sample %in% metadata$sampleID) %>%
   pivot_longer(-sample, names_to = "name") %>%
@@ -107,3 +126,4 @@ write_tsv(perturbations, "perturbations.tsv")
 write_tsv(reads, "reads.tsv")
 write_tsv(taxonomy, "taxonomy.tsv")
 ```
+
