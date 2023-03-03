@@ -1,5 +1,4 @@
 
-
 endpoints <- function(z) {
   start_ix <- c()
   end_ix <- c()
@@ -44,17 +43,30 @@ check_outputs <- function(data) {
 #' @importFrom tibble bind_rows
 #' @export
 md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
-  # outputs data.frames that can be written and input to md2.data.parse
-  # taxonomy, reads, qpcr, metadata, perturbations
-  
   if (is.null(subject_names)) {
-    subject_names <- str_c("subject_", seq_along(ts_inter))
+    subject_names <- str_c("S", seq_along(ts_inter))
   }
-  
+
+  sample_names <- unlist(map(ts_inter, ~ colnames(values(.))))
+  N <- length(sample_names)
+
+  if (is.null(qpcr)) {
+    qpcr <- tibble(
+      sampleID = sample_names,
+      measurement1 = rnorm(sample_names, 1e9, 100),
+      measurement2 = rnorm(N, 1e9, 100),
+      measurement3 = rnorm(N, 1e9, 100)
+    )
+  }
+
   data <- list(
     reads = list(),
-    perturbations = list()
+    perturbations = list(),
+    metadata = list(),
+    taxonomy = taxonomy,
+    qpcr = qpcr
   )
+
   for (i in seq_along(ts_inter)) {
     data$reads[[i]] <- values(ts_inter[[i]]) %>%
       data.frame() %>%
@@ -63,13 +75,27 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
     data$perturbations[[i]] <- interventions(ts_inter[[i]]) %>%
       perturbation_windows(ts_inter[[i]]@time) %>%
       mutate(subject = subject_names[i])
+    data$metadata[[i]] <- tibble(
+      subject = subject_names[i],
+      sampleID = colnames(values(ts_inter[[i]])),
+      time = ts_inter[[i]]@time
+    )
   }
   
-  data <- map(data, bind_rows)
+  data$perturbations <- bind_rows(data$perturbations)
+  data$metadata <- bind_rows(data$metadata)
+  data$reads <- reduce(data$reads, left_join, by = "name")
   check_outputs(data)
 }
 
-#for (i in seq_along(result)) {
-#  rownames(interventions(result[[i]])) <- "1"
-#}
-#md <- md_data(result)
+#' @importFrom glue glue
+#' @export
+add_names <- function(ts_inter) {
+  for (i in seq_along(result)) {
+    inter <- interventions(result[[i]])
+   rownames(interventions(result[[i]])) <- str_c("I", seq_along(nrow(inter)))
+   colnames(values(result[[i]])) <- glue("S{i}_T{seq_len(ncol(result[[i]]))}")
+  }
+
+  result
+}
