@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+scripts/md_data
+scripts/negbin
+scripts/mdsine2
+packages/
+scripts/.ipynb_checkpoints
