@@ -1,0 +1,51 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+```{r}
+library(microTF)
+library(tidyverse)
+library(fs)
+theme_set(theme_bw())
+```
+
+```{r}
+data_dir <- path("../../microbiome_transfer_data/david")
+abundances <- read_csv(data_dir / "abundance.csv") %>%
+  rename(sample = `...1`)
+samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "subject", "time")) %>%
+  mutate(intervention = str_extract(subject, "[A-z]+"))
+subject <- read_csv(data_dir / "subject_data.csv")
+keep_ix <- colMeans(as.matrix(abundances[, -1]) != 0) > 0.2
+reads <- abundances[, c(TRUE, keep_ix)] %>%
+  column_to_rownames("sample")
+```
+
+
+```{r}
+interventions <- samples %>%
+  select(time, intervention, sample) %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = intervention, values_fill = 0) %>%
+  column_to_rownames("sample") %>%
+  mutate(
+    perturbation_window = time >= 0 & time <= 5,
+    Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
+    Plant = ifelse(perturbation_window & Plant == 1, 1, 0) 
+  ) %>%
+  select(Plant, Animal)
+
+
+ts_inter <- ts_from_dfs(reads, interventions, samples)
+```
+
+```{r}
+values(ts_inter[[1]])
+interventions(ts_inter[[1]])
+ts_inter[[1]]@time
+```
