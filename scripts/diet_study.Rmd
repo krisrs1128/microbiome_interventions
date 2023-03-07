@@ -64,11 +64,19 @@ points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
 
 ```{r}
 fit <- train(ts, method = "gbm")
+```
 
-train_data <- patchify_df(result, p = 1, q = 4)
+
+```{r}
+train_data <- patchify_df(ts, p = 1, q = 4)
 y_hat <- predict(fit@parameters[[1]], train_data$x)
 plot(train_data$y[[1]], y_hat)
 abline(a = 0, b = 1, col = "red")
+```
 
+```{r}
+new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2)
+y_hat <- gbm_predict_(fit@parameters, ts, new_interventions)
+plot(values(y_hat[[2]])[1, ])
 ```
 
