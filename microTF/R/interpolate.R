@@ -1,12 +1,13 @@
 
-approx_mat <- function(time, y_mat, n, method) {
+approx_mat <- function(time, y_mat, times_out, method) {
+  n <- length(times_out)
   new_y <- matrix(nrow = nrow(y_mat), ncol = n, dimnames = list(rownames(y_mat), seq_len(n)))
   
   for (i in seq_len(nrow(y_mat))) {
     new_y[i, ] <- approx(
       time, 
       y_mat[i, ], 
-      n = n, 
+      times_out,
       method = method
     )$y
   }
@@ -14,26 +15,21 @@ approx_mat <- function(time, y_mat, n, method) {
   new_y
 }
 
-interpolate_ <- function(ts_inter_single, n, method) {
+interpolate_ <- function(ts_inter_single, delta, method) {
   time <- ts_inter_single@time
-  ts_inter_single@time <- approx(
-    seq_along(time), 
-    time, 
-    n = n, 
-    method = method
-  )$y
-  
+  times_out <- seq(min(time), max(time), by = delta)
+  ts_inter_single@time <- seq(min(time), max(time), delta)
+
   v <- values(ts_inter_single)
   inter <- interventions(ts_inter_single)
-  
-  values(ts_inter_single) <- approx_mat(time, v, n, method)
-  interventions(ts_inter_single) <- approx_mat(time, inter, n, method)
+  values(ts_inter_single) <- approx_mat(time, v, times_out, method)
+  interventions(ts_inter_single) <- approx_mat(time, inter, times_out, method)
   ts_inter_single
 }
 
-interpolate <- function(ts_inter, n = 20, method = "constant") {
+interpolate <- function(ts_inter, delta = 1, method = "constant") {
   for (i in seq_along(ts_inter)) {
-    ts_inter[[i]] <- interpolate_(ts_inter[[i]], n, method)
+    ts_inter[[i]] <- interpolate_(ts_inter[[i]], delta, method)
   }
   ts_inter
 }
