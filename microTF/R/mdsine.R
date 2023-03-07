@@ -17,6 +17,7 @@ endpoints <- function(z) {
   list(start = start_ix, end = end_ix)
 }
 
+#' @importFrom dplyr bind_rows
 perturbation_windows <- function(z, times) {
   perturbations <- list()
   
@@ -40,7 +41,7 @@ check_outputs <- function(data) {
 }
 
 #' @importFrom tibble as_tibble
-#' @importFrom tibble bind_rows
+#' @importFrom dplyr bind_rows
 #' @export
 md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
   if (is.null(subject_names)) {
