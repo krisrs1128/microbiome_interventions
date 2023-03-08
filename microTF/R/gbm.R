@@ -1,7 +1,7 @@
 
 split_future <- function(series_i) {
   t1 <- ncol(series_i)
-  t2 <- ncol(series_i)
+  t2 <- ncol(interventions(series_i))
   values <- values(series_i[, seq_len(t1)])
   inter <- interventions(series_i)[, seq(t1 + 1, t2), drop = FALSE]
   list(values = values, interventions = inter)
