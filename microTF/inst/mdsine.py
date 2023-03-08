@@ -42,3 +42,18 @@ def mdsine(dataset, **kwargs):
   params = set_params(model="MCMC", negbin_a0=a0, negbin_a1=a1, **kwargs)
   mcmc = md2.initialize_graph(params=params, graph_name=dataset.name, subjset=dataset)
   return md2.run_graph(mcmc)
+
+
+def forward_simulate(fit, x0, perturbations=None, starts=None, ends=None, 
+                     dt=0.25, n_days=3):
+  growth = md2.summary(fit.graph[STRNAMES.GROWTH_VALUE])["mean"]
+  interactions = md2.summary(fit.graph[STRNAMES.INTERACTIONS_OBJ])["mean"]
+  dyn = md2.model.gLVDynamicsSingleClustering(
+    growth=growth, 
+    interactions=interactions, 
+    perturbations=perturbations, 
+    perturbation_starts=starts, 
+    perturbation_ends=ends
+  )
+  return md2.integrate(dynamics=dyn, dt=dt, n_days=n_days, initial_conditions=x0)
+

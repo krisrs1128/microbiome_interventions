@@ -21,6 +21,25 @@ mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, ...) {
   py$mdsine(dataset, ...)
 }
 
+forward_simulate <- function(object, newdata, dt=0.25, n_days=3) {
+  fit <- object@parameters
+  series <- list()
+  
+  for (i in seq_along(newdata)) {
+    split_data <- split_future(newdata[[i]])
+    pdata <- perturbation_intervals(split_data$interventions)
+    x0 <- split_data$values[, ncol(split_data$values)]
+    y_hat_i <- py$forward_simulate(
+      fit, x0, pdata$perturbations, pdata$starts, pdata$ends, dt, n_days
+    )
+    
+    series_i <- newdata[[i]]
+    values(series_i) <- cbind(values(series_i), y_hat_i)
+    series[[i]] <- series_i
+  }
+  
+  new("ts_inter", series = series)
+}
 
 endpoints <- function(z) {
   start_ix <- c()
