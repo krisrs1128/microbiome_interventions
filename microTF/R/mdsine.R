@@ -15,30 +15,59 @@ mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, ...) {
   vars <- c("taxonomy", "reads", "qpcr", "metadata", "perturbations")
   paths <- map(vars, ~ f / glue("{.}.tsv"))
   names(paths) <- vars
-  
+
   map2(vars, paths, ~ write_tsv(get(.x), .y))
   dataset <- py$md_data(paths)
   py$mdsine(dataset, ...)
 }
 
-forward_simulate <- function(object, newdata, dt=0.25, n_days=3) {
+forward_simulate <- function(object, newdata, dt=0.25) {
   fit <- object@parameters
   series <- list()
-  
+
   for (i in seq_along(newdata)) {
-    split_data <- split_future(newdata[[i]])
-    pdata <- perturbation_intervals(split_data$interventions)
-    x0 <- split_data$values[, ncol(split_data$values)]
-    y_hat_i <- py$forward_simulate(
-      fit, x0, pdata$perturbations, pdata$starts, pdata$ends, dt, n_days
-    )
-    
-    series_i <- newdata[[i]]
-    values(series_i) <- cbind(values(series_i), y_hat_i)
+    if (ncol(newdata[[i]]) == ncol(interventions(newdata[[i]]))) {
+      series_i <- newdata[[i]]
+    } else {
+
+      # get the perturbation and initial conditions for simulation
+      split_data <- split_future(newdata[[i]])
+      pdata <- perturbation_intervals(newdata[[i]])
+      x0 <- split_data$values[, ncol(split_data$values), drop = FALSE]
+
+      # get the forward simulation values at the required times
+      sim <- py$forward_simulate(
+        fit, x0, pdata$perturbations, pdata$starts, pdata$ends, dt, ncol(split_data$interventions)
+      )
+      y_hat <- sim$X[, sim$times %in% seq(0, ncol(split_data$interventions) - 1)]
+
+      # input results to the original ts_inter object
+      series_i <- newdata[[i]]
+      values(series_i) <- cbind(values(series_i), y_hat)
+
+    }
     series[[i]] <- series_i
   }
-  
   new("ts_inter", series = series)
+}
+
+perturbation_intervals <- function(ts_inter) {
+  inter <- interventions(ts_inter)
+  perturbation_types <- rownames(inter)
+  windows <- perturbation_windows(inter, ts_inter@time)
+
+  perturbations <- list()
+  for (i in seq_along(perturbation_types)) {
+    if (perturbation_types[i] %in% windows$name) {
+      perturbations[[i]] <- matrix(1, 1, nrow(ts_inter))
+    } else {
+      perturbations[[i]] <- matrix(0, 1, nrow(ts_inter))
+      windows <- windows %>%
+        bind_rows(tibble(name = perturbation_types[i], start = 0, end = 1))
+    }
+  }
+
+  list(perturbations = perturbations, starts = windows$start, ends = windows$end)
 }
 
 endpoints <- function(z) {
@@ -47,7 +76,7 @@ endpoints <- function(z) {
   if (z[1] != 0) {
     start_ix <- c(start_ix, 1)
   }
-  
+
   for (i in seq_len(length(z) - 1)) {
     if (z[i] == 0 & z[i + 1] != 0) {
       start_ix <- c(start_ix, i + 1)
@@ -55,14 +84,14 @@ endpoints <- function(z) {
       end_ix <- c(end_ix, i + 1)
     }
   }
-  
+
   list(start = start_ix, end = end_ix)
 }
 
 #' @importFrom dplyr bind_rows
 perturbation_windows <- function(z, times) {
   perturbations <- list()
-  
+
   k <- 1
   for (i in seq_len(nrow(z))) {
     boundaries <- endpoints(z[i, ])
@@ -74,7 +103,7 @@ perturbation_windows <- function(z, times) {
     k <- k + 1
 
   }
-  
+
   bind_rows(perturbations)
 }
 
@@ -88,18 +117,18 @@ dummy_perturbations <- function(perturbations) {
 resolve_perturbations <- function(perturbations, dummies) {
   subjects <- perturbations$subject
   names <- perturbations$name
-  
+
   for (i in seq_len(nrow(dummies))) {
     exists <- any(
-      subjects == dummies$subject[i] & 
+      subjects == dummies$subject[i] &
       names == dummies$name[i]
     )
-    
+
     if (!exists) {
       perturbations <- rbind(perturbations, dummies[i, ])
     }
   }
-  
+
   perturbations
 }
 
@@ -152,7 +181,7 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
       time = ts_inter[[i]]@time
     )
   }
-  
+
   data$perturbations <- bind_rows(data$perturbations)
   data$metadata <- bind_rows(data$metadata)
   data$reads <- reduce(data$reads, left_join, by = "name")

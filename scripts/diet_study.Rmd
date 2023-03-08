@@ -85,3 +85,9 @@ hyper <- list(taxonomy = taxonomy[1:50, ])
 fit <- train(ts, "mdsine", hyper)
 ```
 
+```{r}
+t_start <- 4
+values(ts[[1]]) <- values(ts[[1]])[, seq_len(t_start), drop = FALSE]
+forward_simulate(fit, ts)
+```
+

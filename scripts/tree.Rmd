@@ -80,7 +80,6 @@ n_ahead <- 20
 
 # hide the second half of each test sample
 stest <- splits$test
-new_interventions <- list()
 for (i in seq_along(splits$test)) {
   values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
 }
