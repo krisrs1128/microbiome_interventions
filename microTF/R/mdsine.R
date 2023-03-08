@@ -1,4 +1,25 @@
 
+#' @export
+mdsineR <- function(ts_inter, taxonomy) {
+  data <- md_data(ts_inter, taxonomy)
+  do.call(mdsineR_, data)
+}
+
+#' @importFrom fs path
+#' @importFrom reticulate py
+#' @export
+mdsineR_ <- function(taxonomy, reads, qpcr, metadata, perturbations, ...) {
+  f <- path(tempdir())
+  vars <- c("taxonomy", "reads", "qpcr", "metadata", "perturbations")
+  paths <- map(vars, ~ f / glue("{.}.tsv"))
+  names(paths) <- vars
+  
+  map2(vars, paths, ~ write_tsv(get(.x), .y))
+  dataset <- py$md_data(paths)
+  py$mdsine(dataset, ...)
+}
+
+
 endpoints <- function(z) {
   start_ix <- c()
   end_ix <- c()
@@ -77,8 +98,8 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
       perturbation_windows(ts_inter[[i]]@time) %>%
       mutate(subject = subject_names[i])
     data$metadata[[i]] <- tibble(
-      subject = subject_names[i],
       sampleID = colnames(values(ts_inter[[i]])),
+      subject = subject_names[i],
       time = ts_inter[[i]]@time
     )
   }
@@ -100,3 +121,4 @@ add_names <- function(ts_inter) {
 
   result
 }
+

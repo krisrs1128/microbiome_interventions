@@ -12,6 +12,7 @@ approx_mat <- function(time, y_mat, times_out, method) {
     )$y
   }
   
+  colnames(new_y) <- str_c("T", seq_len(ncol(new_y)))
   new_y
 }
 
@@ -27,9 +28,12 @@ interpolate_ <- function(ts_inter_single, delta, method) {
   ts_inter_single
 }
 
+#' @export
 interpolate <- function(ts_inter, delta = 1, method = "constant") {
   for (i in seq_along(ts_inter)) {
     ts_inter[[i]] <- interpolate_(ts_inter[[i]], delta, method)
+    colnames(values(ts_inter[[i]])) <- str_c("S", i, colnames(values(ts_inter[[i]])))
+    colnames(interventions(ts_inter[[i]])) <- str_c("S", i, colnames(interventions(ts_inter[[i]])))
   }
   ts_inter
 }
