@@ -82,6 +82,6 @@ plot(values(y_hat[[2]])[j, ])
 ```{r}
 taxonomy <- read_tsv("md_data/taxonomy.tsv")
 hyper <- list(taxonomy = taxonomy[1:50, ])
-train(ts, "mdsine", hyper)
+fit <- train(ts, "mdsine", hyper)
 ```
 
