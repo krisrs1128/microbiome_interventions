@@ -26,7 +26,7 @@ subject <- read_csv(data_dir / "subject_data.csv")
 keep_ix <- colMeans(as.matrix(abundances[, -1]) != 0) > 0.2
 reads <- abundances[, c(TRUE, keep_ix)] %>%
   column_to_rownames("sample") %>%
-  .[, 1:10]
+  .[, 1:50]
 ```
 
 
@@ -63,19 +63,15 @@ points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
 
 ### Cross Validation
 
-```{r}
+```{r, eval = FALSE}
 fit <- train(ts, method = "gbm")
-```
-
-
-```{r}
 train_data <- patchify_df(ts, p = 1, q = 4)
 y_hat <- predict(fit@parameters[[1]], train_data$x)
 plot(train_data$y[[1]], y_hat)
 abline(a = 0, b = 1, col = "red")
 ```
 
-```{r}
+```{r, eval = FALSE}
 new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2)
 y_hat <- gbm_predict_(fit@parameters, ts[1:2], new_interventions)
 plot(values(y_hat[[2]])[j, ])
@@ -85,6 +81,7 @@ plot(values(y_hat[[2]])[j, ])
 
 ```{r}
 taxonomy <- read_tsv("md_data/taxonomy.tsv")
-mdsineR(ts, taxonomy[1:10, ])
+hyper <- list(taxonomy = taxonomy[1:50, ])
+train(ts, "mdsine", hyper)
 ```
 

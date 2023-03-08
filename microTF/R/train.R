@@ -20,7 +20,12 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
     )
     fit <- model$variational(data_list)
     result <- new("transfer_model", parameters = fit, method = method)
-
+    
+  } else if (method == "mdsine") {
+    
+    fit <- mdsine(ts, hyper$taxonomy)
+    result <- new("transfer_model", parameters = fit, method = method)
+    
   } else if(method == "gbm") {
 
     train_data <- patchify_df(ts_inter)
@@ -29,9 +34,8 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
       fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), "gaussian")
     }
     result <- new("transfer_model", parameters = fit, method = method)
-    
+
   }
-  
   result
 }
 

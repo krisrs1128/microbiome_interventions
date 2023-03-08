@@ -1,14 +1,16 @@
 
 #' @export
-mdsineR <- function(ts_inter, taxonomy) {
+mdsine <- function(ts_inter, taxonomy) {
   data <- md_data(ts_inter, taxonomy)
-  do.call(mdsineR_, data)
+  do.call(mdsine_, data)
 }
 
 #' @importFrom fs path
-#' @importFrom reticulate py
+#' @importFrom reticulate py use_condaenv source_python
 #' @export
-mdsineR_ <- function(taxonomy, reads, qpcr, metadata, perturbations, ...) {
+mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, ...) {
+  use_condaenv("mdsine2")
+  source_python("../microTF/inst/mdsine.py")
   f <- path(tempdir())
   vars <- c("taxonomy", "reads", "qpcr", "metadata", "perturbations")
   paths <- map(vars, ~ f / glue("{.}.tsv"))
@@ -57,8 +59,35 @@ perturbation_windows <- function(z, times) {
   bind_rows(perturbations)
 }
 
+dummy_perturbations <- function(perturbations) {
+  subjects <- unique(perturbations$subject)
+  names <- unique(perturbations$name)
+  expand.grid(subject = subjects, name = names) %>%
+    mutate(start = 0, end = 1)
+}
+
+resolve_perturbations <- function(perturbations, dummies) {
+  subjects <- perturbations$subject
+  names <- perturbations$name
+  
+  for (i in seq_len(nrow(dummies))) {
+    exists <- any(
+      subjects == dummies$subject[i] & 
+      names == dummies$name[i]
+    )
+    
+    if (!exists) {
+      perturbations <- rbind(perturbations, dummies[i, ])
+    }
+  }
+  
+  perturbations
+}
+
 check_outputs <- function(data) {
-  data  
+  dummies <- dummy_perturbations(data$perturbations)
+  data$perturbations <- resolve_perturbations(data$perturbations, dummies)
+  data
 }
 
 #' @importFrom tibble as_tibble
@@ -96,7 +125,8 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
       as_tibble()
     data$perturbations[[i]] <- interventions(ts_inter[[i]]) %>%
       perturbation_windows(ts_inter[[i]]@time) %>%
-      mutate(subject = subject_names[i])
+      mutate(subject = subject_names[i]) %>%
+      select(subject, name, start, end)
     data$metadata[[i]] <- tibble(
       sampleID = colnames(values(ts_inter[[i]])),
       subject = subject_names[i],
