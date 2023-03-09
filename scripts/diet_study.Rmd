@@ -12,6 +12,7 @@ library(microTF)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
+#reticulate::use_condaenv("~/miniforge-pypy3/envs/mdsine2/")
 ```
 
 ### Data Preprocessing
@@ -43,14 +44,7 @@ interventions <- samples %>%
   ) %>%
   select(Plant, Animal)
 
-
 ts_inter <- ts_from_dfs(reads, interventions, samples)
-```
-
-```{r}
-values(ts_inter[[1]])
-interventions(ts_inter[[1]])
-ts_inter[[1]]@time
 ```
 
 ```{r}
@@ -61,7 +55,7 @@ plot(ts[[i]]@time, values(ts[[i]])[j, ], col = "red")
 points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
 ```
 
-### Cross Validation
+### GBM training
 
 ```{r, eval = FALSE}
 fit <- train(ts, method = "gbm")
@@ -102,6 +96,7 @@ plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ]))
 points(values(y_hat[[i]])[1, ], col = "red")
 ```
 
+### Comparison across methods
 
 ```{r}
 tr_fun <- function(method, hyper = list()) {
@@ -110,7 +105,26 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-cross_validate(ts, tr_fun("gbm"))
-cross_validate(ts, tr_fun("mdsine"))
+metrics <- list()
+metrics[["gbm"]] <- cross_validate(ts, tr_fun("gbm"))
+```
+
+
+```{r}
+taxonomy <- read_csv(data_dir / "taxaTable.csv") %>%
+  mutate(
+    name = str_c("Otu", str_pad(tax_id, 6, "left", "0")),
+    sequence = NA,
+  ) %>%
+  filter(name %in% rownames(values(ts[[1]]))) %>%
+  rename(kingdom = superkingdom)
+
+taxa_names <- rownames(values(ts[[1]]))
+new_ix <- !(taxa_names %in% taxonomy$name)
+taxonomy <- taxonomy %>%
+  bind_rows(data.frame(name = taxa_names[new_ix]))
+
+hyper <- list(taxonomy = taxonomy3)
+metrics[["mdsine"]] <- cross_validate(ts, tr_fun("mdsine", hyper))
 ```
 
