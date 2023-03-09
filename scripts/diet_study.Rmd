@@ -80,7 +80,7 @@ plot(values(y_hat[[2]])[j, ])
 ### MDSINE
 
 ```{r}
-taxonomy <- read_tsv("md_data/taxonomy.tsv")
+taxonomy <- read_tsv(data_dir / "taxonomy.tsv")
 hyper <- list(taxonomy = taxonomy[1:50, ])
 splits <- train_test_split(ts, 1 / 5)
 fit <- train(splits$train, "mdsine", hyper)
@@ -102,4 +102,15 @@ plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ]))
 points(values(y_hat[[i]])[1, ], col = "red")
 ```
 
+
+```{r}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    train(x, method, hyper)
+  }
+}
+
+cross_validate(ts, tr_fun("gbm"))
+cross_validate(ts, tr_fun("mdsine"))
+```
 

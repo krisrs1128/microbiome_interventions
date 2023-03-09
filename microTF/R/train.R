@@ -1,5 +1,4 @@
 
-#' @importFrom cmdstanr cmdstan_model
 #' @importFrom gbm gbm
 #' @export
 train <- function(ts_inter, method = "zeros", hyper = list()) {
@@ -27,7 +26,6 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
     result <- new("transfer_model", parameters = fit, method = method)
     
   } else if(method == "gbm") {
-
     train_data <- patchify_df(ts_inter)
     fit <- list()
     for (j in seq_along(train_data$y)) {

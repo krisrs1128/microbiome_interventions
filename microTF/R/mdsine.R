@@ -33,13 +33,15 @@ forward_simulate <- function(object, newdata, dt=0.25) {
       # get the perturbation and initial conditions for simulation
       split_data <- split_future(newdata[[i]])
       pdata <- perturbation_intervals(newdata[[i]])
-      x0 <- split_data$values[, ncol(split_data$values), drop = FALSE]
+      val <- values(split_data$pre)
+      x0 <- val[, ncol(val), drop = FALSE]
 
       # get the forward simulation values at the required times
+      n_future <- ncol(split_data$interventions)
       sim <- py$forward_simulate(
-        fit, x0, pdata$perturbations, pdata$starts, pdata$ends, dt, ncol(split_data$interventions)
+        fit, x0, pdata$perturbations, pdata$starts, pdata$ends, dt, n_future
       )
-      y_hat <- sim$X[, sim$times %in% seq(0, ncol(split_data$interventions) - 1)]
+      y_hat <- sim$X[, sim$times %in% seq(0, n_future - 1)]
 
       # input results to the original ts_inter object
       series_i <- newdata[[i]]
