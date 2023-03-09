@@ -203,3 +203,16 @@ ggplot(ts_counter) +
 Note that training performance is sensitive to the transformation we gave. We
 are not looking into the full confidence band of each series, but this could be
 of potential interest.
+
+This figure is optimistic, because we haven't split the training and impulse
+function visualization. As a summary, it is okay to look at the full data. But
+as soon as we want to have some population level guarantee on the difference
+between counterfactual transfer functions, this will not be sufficient.
+
+I would like to show this on the same time scale (i.e., relative to min
+intervention time, so they are more aligned). It would be useful to automate the
+calculation of the difference (put it in a package function) and show it as a
+simplified line plot across a collection of taxa.
+
+Finally, we want to be able to learn variations of the function across
+populations.
