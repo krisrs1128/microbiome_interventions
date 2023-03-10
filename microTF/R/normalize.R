@@ -15,6 +15,8 @@ normalize <-  function(reads, method = "none") {
     dds <- phyloseq_to_deseq2(ps, ~ 1)
     size_factors <- sizeFactors(estimateSizeFactors(dds, "poscounts"))
     result <- reads / size_factors
+  } else if (method == "relative_abundance") {
+    result <- reads / rowSums(result)
   }
   
   result
