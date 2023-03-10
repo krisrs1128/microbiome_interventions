@@ -2,6 +2,8 @@
 title: "Untitled"
 output: html_document
 date: "`r Sys.Date()`"
+params:
+  normalization: "mbImpute"
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +15,7 @@ library(microTF)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
-reticulate::use_condaenv("~/miniforge-pypy3/envs/mdsine2/")
+#reticulate::use_condaenv("~/miniforge-pypy3/envs/mdsine2/")
 cols <- c("#466C8C", "#F28705")
 ```
 
@@ -62,8 +64,12 @@ subject <- read_csv(data_dir / "subject_data.csv")
 keep_ix <- colMeans(as.matrix(abundances[, -1]) != 0) > 0.2
 reads <- abundances[, c(TRUE, keep_ix)] %>%
   column_to_rownames("sample") %>%
-  .[, 1:25] %>%
-  asinh()
+  .[, 1:25]
+
+metadata <- samples %>%
+  select(-subject,  -sample) %>%
+  rename(condition = intervention)
+reads <- normalize(reads, params$normalization, metadata, parallel = TRUE, ncores = 4)
 ```
 
 
