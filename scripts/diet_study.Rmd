@@ -7,6 +7,7 @@ date: "`r Sys.Date()`"
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
+
 ```{r}
 library(microTF)
 library(tidyverse)
@@ -44,7 +45,14 @@ interventions <- samples %>%
   ) %>%
   select(Plant, Animal)
 
-ts_inter <- ts_from_dfs(reads, interventions, samples)
+n_subject <- n_distinct(samples$subject)
+subject_data <- tibble(
+  subject = unique(samples$subject),
+  x = rnorm(n_subject)
+)
+
+ts_inter <- ts_from_dfs(reads, interventions, samples, subject_data)
+#ts_inter <- ts_from_dfs(reads, interventions, samples)
 ```
 
 ```{r}
