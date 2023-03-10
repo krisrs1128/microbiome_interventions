@@ -1,3 +1,5 @@
+setClassUnion("data.frameOrNull", members=c("data.frame", "NULL"))
+
 setClass(
   "ts_inter_single", 
   slots = c(
@@ -9,7 +11,10 @@ setClass(
 
 setClass(
   "ts_inter",
-  slots = c(series = "list")
+  slots = c(
+    series = "list",
+    subject_data = "data.frameOrNull"
+  )
 )
 
 setClass(
@@ -92,3 +97,14 @@ setMethod("interventions<-", "ts_inter_single", function(x, value) {
   x@interventions <- value
   x
 })
+
+#' @export
+setGeneric("times", function(x) standardGeneric("times"))
+setMethod("times", "ts_inter_single", function(x) x@time)
+
+#' @export
+setGeneric("subject_data", function(x) standardGeneric("subject_data"))
+setMethod("subject_data", "ts_inter", function(x) x@subject_data)
+
+#' @export
+setMethod("names", "ts_inter", function(x) names(x@series))

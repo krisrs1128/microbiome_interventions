@@ -27,10 +27,11 @@ tidy_ts <- function(ts_inter) {
 }
 
 #' @export
-ts_from_dfs <- function(reads, interventions, metadata) {
+ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   subjects <- unique(metadata$subject)
   series <- list()
 
+  # fill in each subject's intervention and abundance data
   for (i in seq_along(subjects)) {
     sample_ix <- metadata %>%
       filter(subject == subjects[i]) %>%
@@ -46,6 +47,14 @@ ts_from_dfs <- function(reads, interventions, metadata) {
       time = sort(sample_ix)
     )
   }
+
+  # ensure subject and metadata order agree
+  if (!is.null(subject_data)) {
+    names(series) <- subjects
+    subject_data <- metadata %>%
+      select(subject) %>%
+      left_join(subject_data)
+  }
   
-  new("ts_inter", series = series)
+  new("ts_inter", series = series, subject_data = subject_data)
 }

@@ -53,11 +53,17 @@ patchify_single_df <- function(ts_inter) {
 }
 
 #' @importFrom purrr map_dfr
+#' @importFrom dplyr select bind_cols
 #' @export
 patchify_df <- function(ts_inter, p = 2, q = 3) {
   patches <- list()
   for (i in seq_along(ts_inter)) {
     patches[[i]] <- patchify_single_df(ts_inter[[i]])
+    sdata <- subject_data(ts_inter)
+    if (!is.null(sdata)) {
+      patches[[i]]$x <- patches[[i]]$x |>
+        bind_cols(select(sdata[i, ], -subject))
+    }
   }
   
   x <- map_dfr(patches, ~ as_tibble(.$x))
@@ -78,10 +84,10 @@ predictor_names <- function(x_dim, z_dim) {
 }
 
 lag_from_names <- function(names, group = "taxon") {
-  names[str_detect(names, "taxon")] %>%
-    str_extract("lag[0-9]+") %>%
-    str_remove("lag") %>%
-    as.numeric() %>%
+  names[str_detect(names, "taxon")] |>
+    str_extract("lag[0-9]+") |>
+    str_remove("lag") |>
+    as.numeric() |>
     max()
 }
 
@@ -98,7 +104,7 @@ predictors <- function(ts_inter, z_next, lags) {
   x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
   z_prev <- cbind(z[, seq(ncol(z) - lags[2] + 2, ncol(z)), drop = FALSE], z_next)
   
-  cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) %>%
-    as.data.frame() %>%
+  cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) |>
+    as.data.frame() |>
     set_names(predictor_names(dim(x_prev), dim(z_prev)))
 }

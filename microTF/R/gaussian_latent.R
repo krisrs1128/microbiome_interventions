@@ -91,7 +91,6 @@ gaussian_latent_predict_ <- function(ts_inter, interventions, params) {
   list(z_past = z_past, z = z, x = x)
 }
 
-#' @importFrom cmdstanr cmdstan_model
 #' @export
 gaussian_infer_latent <- function(x_obs, interventions, params, n_draws = 100) {
   data_list <- list(
