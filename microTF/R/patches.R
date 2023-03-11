@@ -62,7 +62,7 @@ patchify_df <- function(ts_inter, p = 2, q = 3) {
     sdata <- subject_data(ts_inter)
     if (!is.null(sdata)) {
       patches[[i]]$x <- patches[[i]]$x |>
-        bind_cols(select(sdata[i, ], -subject))
+        bind_cols(select(sdata[i, ], -subject, -sample))
     }
   }
   

@@ -5,7 +5,7 @@
 #' @export
 normalize <-  function(reads, method = "none",  metadata = NULL, ...) {
   if (method == "none") {
-    result <- x
+    result <- reads
   } else if (method == "DESeq2") {
 
     # construct design for DESeq2 object
@@ -27,7 +27,7 @@ normalize <-  function(reads, method = "none",  metadata = NULL, ...) {
     result <- reads / size_factors
 
   } else if (method == "relative_abundance") {
-    result <- reads / rowSums(result)
+    result <- reads / rowSums(reads)
   } else if (method == "mbImpute") {
     condition <- pull(metadata, condition)
     metadata <- select(metadata, -condition)
