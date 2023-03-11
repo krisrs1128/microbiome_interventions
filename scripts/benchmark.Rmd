@@ -1,0 +1,77 @@
+---
+title: "benchmark"
+output: html_document
+date: "2023-03-10"
+params:
+  normalization: "none"
+  method: "gbm"
+  data_path: "data/diet_study.rda"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(microTF)
+```
+
+
+```{r}
+load(params$data_path)
+
+metadata <- select(samples, -subject:-sample)
+ts <- reads |>
+  normalize(
+    params$normalization,
+    select(samples, -sample, -subject),
+    parallel = TRUE,
+    ncores = 4
+  ) |>
+  ts_from_dfs(
+    interventions, 
+    samples,
+    subject_data
+  ) |>
+  interpolate()
+```
+
+## Cross-validate and save metrics
+
+```{r}
+tr_fun <- function(method, hyper = NULL) {
+  if (is.null(hyper)) {
+    if (method == "mdsine") {
+      hyper <- list(taxonomy = taxonomy)
+    } else {
+      hyper <- list()
+    }
+  }
+  
+  function(x) {
+    train(x, method, hyper)
+  }
+}
+
+metrics <- cross_validate(ts, tr_fun(params$method))
+```
+
+```{r}
+out_path <- glue::glue("{params$data_path}-{params$method}-{params$normalization}.rda")
+save(params, metrics, file = out_path)
+```
+
+
+```{r, eval = FALSE}
+for (normalization in c("none", "DESeq2", "mbImpute", "relative_abundance")) {
+  for (method in c("mdsine2", "gbm")) {
+    for (data_path in c("data/diet_study.rda")) {
+      system(glue::glue("Rscript -e \"rmarkdown::render('benchmark.Rmd', params = list(normalization = '{normalization}', method = '{method}', data_path = '{data_path}'))\""))
+    }
+  }
+}
+```
+
+
+

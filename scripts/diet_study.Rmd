@@ -13,126 +13,53 @@ library(microTF)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
-#reticulate::use_condaenv("~/miniforge-pypy3/envs/mdsine2/")
 ```
-
-### Data Preprocessing
 
 ```{r}
 data_dir <- path("../../microbiome_transfer_data/david")
-abundances <- read_csv(data_dir / "abundance.csv") %>%
-  rename(sample = `...1`)
-samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "subject", "time")) %>%
+reads <- read_csv(data_dir / "abundance.csv") |>
+  rename(sample = `...1`) |>
+  column_to_rownames("sample") |>
+  as.matrix()
+samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "subject", "time")) |>
   mutate(intervention = str_extract(subject, "[A-z]+"))
 subject <- read_csv(data_dir / "subject_data.csv")
-keep_ix <- colMeans(as.matrix(abundances[, -1]) != 0) > 0.2
-reads <- abundances[, c(TRUE, keep_ix)] %>%
-  column_to_rownames("sample") %>%
-  .[, 1:50]
-```
 
-
-```{r}
-interventions <- samples %>%
-  select(time, intervention, sample) %>%
-  mutate(value = 1) %>%
-  pivot_wider(names_from = intervention, values_fill = 0) %>%
-  column_to_rownames("sample") %>%
-  mutate(
-    perturbation_window = time >= 0 & time <= 5,
-    Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
-    Plant = ifelse(perturbation_window & Plant == 1, 1, 0) 
-  ) %>%
-  select(Plant, Animal)
-
-n_subject <- n_distinct(samples$subject)
-subject_data <- tibble(
-  subject = unique(samples$subject),
-  x = rnorm(n_subject)
-)
-
-ts_inter <- ts_from_dfs(reads, interventions, samples, subject_data)
-#ts_inter <- ts_from_dfs(reads, interventions, samples)
+keep_ix <- colMeans(reads != 0) > 0.7 # very aggressive, but just for testing
+reads <- reads[, as.logical(keep_ix)]
 ```
 
 ```{r}
-ts <- interpolate(ts_inter)
-
-i <- 6; j <- 10
-plot(ts[[i]]@time, values(ts[[i]])[j, ], col = "red")
-points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
-```
-
-### GBM training
-
-```{r, eval = FALSE}
-fit <- train(ts, method = "gbm")
-train_data <- patchify_df(ts, p = 1, q = 4)
-y_hat <- predict(fit@parameters[[1]], train_data$x)
-plot(train_data$y[[1]], y_hat)
-abline(a = 0, b = 1, col = "red")
-```
-
-```{r, eval = FALSE}
-new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2)
-y_hat <- gbm_predict_(fit@parameters, ts[1:2], new_interventions)
-plot(values(y_hat[[2]])[j, ])
-```
-
-### MDSINE
-
-```{r}
-taxonomy <- read_tsv(data_dir / "taxonomy.tsv")
-hyper <- list(taxonomy = taxonomy[1:50, ])
-splits <- train_test_split(ts, 1 / 5)
-fit <- train(splits$train, "mdsine", hyper)
-```
-
-```{r}
-t_start <- 4
-stest <- splits$test
-for (i in seq_along(stest)) {
-  values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
-}
-
-y_hat <- predict(fit, stest)
-```
-
-```{r}
-i <- 1
-plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ]))
-points(values(y_hat[[i]])[1, ], col = "red")
-```
-
-### Comparison across methods
-
-```{r}
-tr_fun <- function(method, hyper = list()) {
-  function(x) {
-    train(x, method, hyper)
-  }
-}
-
-metrics <- list()
-metrics[["gbm"]] <- cross_validate(ts, tr_fun("gbm"))
-```
-
-
-```{r}
-taxonomy <- read_csv(data_dir / "taxaTable.csv") %>%
+taxonomy <- read_csv("https://raw.githubusercontent.com/gerberlab/mitre/master/mitre/example_data/david/taxaTable.csv") |>
   mutate(
     name = str_c("Otu", str_pad(tax_id, 6, "left", "0")),
     sequence = NA,
-  ) %>%
-  filter(name %in% rownames(values(ts[[1]]))) %>%
+  ) |>
+  filter(name %in% colnames(reads)) |>
   rename(kingdom = superkingdom)
-
-taxa_names <- rownames(values(ts[[1]]))
+taxa_names <- colnames(reads)
 new_ix <- !(taxa_names %in% taxonomy$name)
-taxonomy <- taxonomy %>%
+taxonomy <- taxonomy |>
   bind_rows(data.frame(name = taxa_names[new_ix]))
-
-hyper <- list(taxonomy = taxonomy3)
-metrics[["mdsine"]] <- cross_validate(ts, tr_fun("mdsine", hyper))
 ```
 
+
+```{r}
+interventions <- samples |>
+  select(time, intervention, sample) |>
+  mutate(value = 1) |>
+  pivot_wider(names_from = intervention, values_fill = 0) |>
+  column_to_rownames("sample") |>
+  mutate(
+    perturbation_window = time >= 0 & time <= 5,
+    Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
+    Plant = ifelse(perturbation_window & Plant == 1, 1, 0)
+  ) |>
+  select(Plant, Animal)
+
+subject_data <- NULL
+samples <- samples |>
+  rename(condition = intervention)
+
+save(samples, reads, interventions, subject_data, taxonomy, file = "data/diet_study.rda")
+```

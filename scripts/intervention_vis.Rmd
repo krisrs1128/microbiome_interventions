@@ -72,7 +72,6 @@ metadata <- samples %>%
 reads <- normalize(reads, params$normalization, metadata, parallel = TRUE, ncores = 4)
 ```
 
-
 ```{r}
 interventions <- samples %>%
   select(time, intervention, sample) %>%
