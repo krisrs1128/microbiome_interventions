@@ -1,0 +1,125 @@
+---
+title: "simulation"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(microTF)
+library(tidyverse)
+library(fs)
+theme_set(theme_bw())
+```
+
+```{r}
+step_t <- function(f, g, h) {
+  fun <- function(x, w, z) {
+    f(x) + g(w) + h(x, w)
+  }
+  params <- list(P = f$lag, Q = g$lag, PQ = h$lag)
+  list(fun = fun, params = params)
+}
+
+
+f <- linear_sum(5, 1)
+g <- linear_sum(5, 1, 2)
+step_generator <- step_t(f, g, h)
+
+
+
+matnorm <- function(N, M, mu = 0, sigma = 1) {
+  matrix(rnorm(N * M, mu, sigma), N, M)
+}
+
+factorized_step <- function(J, K, D = NULL) {
+  if (is.null(D)) {
+    D <- J
+  }
+  
+  Theta <- matnorm(J, K)
+  B <- matnorm(K, D)
+  list(B = B, Theta = Theta)
+}
+
+sparsify <- function(A, sparsity = 0.8) {
+  ix <- sample(length(A), length(A) * sparsity)
+  A[ix] <- 0
+  A
+}
+
+linear_sum <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 2) {
+  coefs <- replicate(n_lag, ~ factorized_step(n_taxa, n_latent, n_perturb))
+  
+  fun <- function(x) {
+    result <- matrix(0, n_taxa, 1)
+
+    L <- ncol(x)
+    for (l in seq_along(n_lag)) {
+      result <- result + coefs[[l]] %*% x[L - l, ]
+    }
+
+    result
+  }
+  
+  list(fun = fun, lag = n_lag, coefs = coefs)
+}
+
+
+interaction_sum <- function(n_taxa, n_latent, n_perturb, n_lag = 2) {
+  coefs <- replicate(n_lag, ~ {
+    result <- list()
+    for (j in seq_len(n_taxa)) {
+      result[[j]] <- factorized_step(n_taxa, n_latent, n_perturb)
+    }
+  })
+  
+  fun <- function(x, w) {
+    result <- matrix(0, n_taxa, 1)
+    L1 <- ncol(x) 
+    L2 <- ncol(w)
+    
+    for (l in seq_along(n_lag)) {
+      for (j in seq_along(n_taxa)) {
+        result <- result + t(x[, L1 - l]) %*% coefs[[j]][[l]] %*% w[, L2 - l]
+      }
+    }
+    result
+  }
+}
+
+gaussian_sampler <- function(theta, sigma = 1) {
+  if (length(sigma) == 1) {
+    sigma <- rep(sigma, length(theta))
+  }
+  
+  rnorm(theta, sigma)
+}
+
+generate_sample <- function(x0, w, z, step_generator, sampler) {
+  result <- list()
+  n_time <- ncol(w)
+  P <- step_generator$P
+  Q <- step_generator$Q
+  
+  x <- x0
+  for (i in seq(max(P, Q), n_time)) {
+    theta <- step_generator$fun(x[, (i - P) : (i - 1)], w[, (i - Q) : i], z)
+    x <- sampler(theta)
+  }
+  
+  x
+}
+
+
+
+
+
+
+
+
+```
+
