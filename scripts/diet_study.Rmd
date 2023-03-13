@@ -63,3 +63,73 @@ samples <- samples |>
 
 save(samples, reads, interventions, subject_data, taxonomy, file = "data/diet_study.rda")
 ```
+<<<<<<< HEAD
+=======
+
+```{r}
+values(ts_inter[[1]])
+interventions(ts_inter[[1]])
+ts_inter[[1]]@time
+```
+
+```{r}
+ts <- interpolate(ts_inter)
+
+i <- 6; j <- 10
+plot(ts[[i]]@time, values(ts[[i]])[j, ], col = "red")
+points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
+```
+
+### Cross Validation
+
+```{r, eval = FALSE}
+fit <- train(ts, method = "gbm")
+train_data <- patchify_df(ts, p = 1, q = 4)
+y_hat <- predict(fit@parameters[[1]], train_data$x)
+plot(train_data$y[[1]], y_hat)
+abline(a = 0, b = 1, col = "red")
+```
+
+```{r, eval = FALSE}
+new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2)
+y_hat <- gbm_predict_(fit@parameters, ts[1:2], new_interventions)
+plot(values(y_hat[[2]])[j, ])
+```
+
+### MDSINE
+
+```{r}
+taxonomy <- read_tsv("md_data/taxonomy.tsv")
+hyper <- list(taxonomy = taxonomy[1:50, ])
+splits <- train_test_split(ts, 1 / 5)
+fit <- train(splits$train, "mdsine", hyper)
+```
+
+```{r}
+t_start <- 4
+stest <- splits$test
+for (i in seq_along(stest)) {
+  values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
+}
+
+y_hat <- predict(fit, stest)
+```
+
+```{r}
+i <- 1
+plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ]))
+points(values(y_hat[[i]])[1, ], col = "red")
+```
+
+
+```{r}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    train(x, method, hyper)
+  }
+}
+
+mdsine_result <- cross_validate(ts, tr_fun("mdsine", hyper))
+gbm_result <- cross_validate(ts, tr_fun("gbm"))
+
+```
