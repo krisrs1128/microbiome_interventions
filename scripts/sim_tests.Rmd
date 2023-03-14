@@ -22,6 +22,8 @@ This generates the coefficient matrices for dynamics, perturbations, and
 interactions.
 
 ```{r}
+n_subject <- 20
+n_time <- 30
 n_lag <- 5
 n_taxa <- 500
 n_perturb <- 1
@@ -29,11 +31,10 @@ n_latent <- 5
 n_covariates <- 3
 prop_nonnull <- 0.1
 
-A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) %>%
- sparsify() %>%
+A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
+ sparsify() |>
  normalize(0.8)
 B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 0.5)
-  #normalize(10)
 
 nonnull_taxa <- sample(n_taxa, prop_nonnull * n_taxa)
 for (i in seq_along(B)) {
@@ -42,8 +43,8 @@ for (i in seq_along(B)) {
 
 C <- low_rank_step_(n_taxa, n_latent, n_perturb, n_lag)
 for (i in seq_along(C)) {
-  C[[i]] <- C[[i]] %>%
-    sparsify() %>%
+  C[[i]] <- C[[i]] |>
+    sparsify() |>
     normalize(0.2)
 }
 ```
@@ -56,81 +57,124 @@ number of successes before we stop.
 
 ```{r}
 step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C))
-x0 <- matrix(2, n_taxa, n_lag + 1)
-w <- matrix(0, n_perturb, 30)
-w[, 15:20] <- 1
-z <- rnorm(n_covariates)
+theta0 <- matrix(2, n_taxa, n_lag + 1)
+
+w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
+for (i in seq_along(w)) {
+  for (j in seq_len(n_perturb)) {
+    start_ix <- sample(n_time - 2 * n_lag, 1)
+    end_ix <- start_ix + sample(2 * n_lag)
+    w[[i]][j, start_ix:end_ix] <- 1
+  }
+}
+
+z <- matnorm(n_subject, n_covariates)
 sizes <- runif(n_taxa, .1, 10)
 baselines <- rgamma(n_taxa, 1, .1)
-x <- generate_sample(x0, w, z, step_generator, nbinom_sampler(sizes, baselines))
+
+x <- list()
+for (i in seq_len(n_subject)) {
+  x[[i]] <- generate_sample(theta0, w[[i]], z[i, ], step_generator, nbinom_sampler(sizes, baselines))
+  rownames(x[[i]]) <- str_c("tax", seq_len(n_taxa))
+}
+
 ```
 
 Next, we can plot the series.
 
 ```{r}
-rownames(x) <- str_c("tax", seq_len(nrow(x)))
-x_df <- data.frame(x) %>%
-  rownames_to_column("taxon") %>%
-  pivot_longer(-taxon, names_to = "time") %>%
-  mutate(time = as.integer(str_remove(time, "X")))  %>%
+x_df <- map_dfr(x, ~ as_tibble(.) %>% rownames_to_column("taxon"), .id = "subject") |>
+  pivot_longer(starts_with("V"), names_to = "time") |>
+  mutate(
+    time = as.integer(str_remove(time, "V")),
+    taxon = str_c("tax", taxon)
+  )  |>
   filter(time  > n_lag)
 
 B_df <- map_dfr(
-  B, ~ as_tibble(.) %>% 
+  B, ~ as_tibble(.) |> 
     mutate(taxon = str_c("tax", row_number())),
-  .id = "lag") %>%
+  .id = "lag") |>
   pivot_wider(names_from = "lag", values_from = "V1")
 
-x_df <- x_df %>%
+x_df <- x_df |>
   left_join(B_df) %>%
-  mutate(effect = rowSums(.[, -c(1:3)]))
+  mutate(effect = rowSums(.[, -c(1:4)]))
   
-x_df %>%
-  filter(effect != 0) %>%
-  ggplot() +
-  geom_rect(xmin = 15, xmax = 20, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
-  geom_line(aes(time, value, col = effect)) +
+start_ix <- min(which(w[[1]][1, ] == 1))
+end_ix <- max(which(w[[1]][1, ] == 1))
+
+x_df |>
+  filter(effect != 0, subject == "1") |>
+  ggplot(aes(time, value)) +
+  geom_rect(xmin = start_ix, xmax = end_ix, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
+  geom_line(aes(col = effect, group = subject)) +
   facet_wrap(~ reorder(taxon, effect), ncol = 10) +
   scale_y_log10() +
   scale_color_gradient2(mid = "#d3d3d3")
 ```
 
-If we were using DESeq2, how would we test?
 
 ```{r}
-metadata <- tibble(
-  time = seq(n_lag + 1, ncol(x)),
-  perturbation = ifelse(time >= 15 & time <= 20, 1, 0)
-)
+w_df <- map_dfr(w, ~ as_tibble(.), .id = "subject") |>
+  pivot_longer(-subject, names_to = "time", values_to = "w") |>
+  mutate(
+    time = as.integer(str_remove(time, "V")),
+    value = w,
+    sample = str_c("sam", row_number())
+  )
+
+w_df_ <- w_df |>
+  filter(w != 0, time > n_lag)
+
+x_df |>
+  filter(taxon == "tax148") |>
+  ggplot(aes(time, reorder(subject, value))) +
+  geom_tile(aes(fill = log(1 + value))) +
+  geom_point(data = w_df_, shape = 1) +
+  scale_fill_distiller(direction = 1)
+```
+
+If we were using DESeq2, how would we test?
+
+```{r, eval = FALSE}
+x_mat <- map_dfc(x, ~ .[, -seq_len(n_lag)]) %>%
+  as.matrix()
+rownames(x_mat) <- str_c("tax", seq_len(n_taxa))
+colnames(x_mat) <- w_df %>%
+  filter(time > n_lag) %>%
+  pull(sample)
 
 ps <- phyloseq(
-  otu_table(x[, -seq_len(n_lag)], taxa_are_rows = TRUE),
-  sample_data(metadata)
+  otu_table(x_mat, taxa_are_rows = TRUE),
+  sample_data(select(w_df, -value) %>% column_to_rownames("sample"))
 )
 
-dds  <- phyloseq_to_deseq2(ps, ~ perturbation)
+dds  <- phyloseq_to_deseq2(ps, ~ w)
 dds <- DESeq(dds)
 ```
 
-```{r}
-significant <- results(dds) %>%
-  data.frame() %>%
-  rownames_to_column("taxon") %>%
+```{r, eval = FALSE}
+significant <- results(dds) |>
+  data.frame() |>
+  rownames_to_column("taxon") |>
   filter(padj < 0.2)
 
-significant %>%
+significant |>
   arrange(padj)
 ```
 
-These are the taxa that DESeq2 thinks are significant.
+These are the taxa that DESeq2 thinks are significant. We've ordered by
+estimated log fold change and colored by the true perturbation effect.
 
-```{r}
-x_df %>%
-  filter(taxon %in% significant$taxon) %>%
+```{r, eval = FALSE}
+x_df |>
+  right_join(select(significant, taxon, log2FoldChange, padj) %>% filter(padj < 1e-6)) |>
+  filter(subject == 1) |>
   ggplot() +
-  geom_rect(xmin = 15, xmax = 20, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
+  geom_rect(xmin = start_ix, xmax = end_ix, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
   geom_line(aes(time, value, col = effect)) +
-  facet_wrap(~ reorder(taxon, effect)) +
+  facet_wrap(~ reorder(taxon, log2FoldChange)) +
   scale_y_log10() +
   scale_color_gradient2(mid = "#d3d3d3")
 ```
@@ -143,5 +187,5 @@ S <- intersect(nonnull_taxa_,  significant$taxon)
 V <- setdiff(significant$taxon, nonnull_taxa_)
 ```
 
-At a $q$-level of 0.2, the FDP is `r length(V) / length(R)`. The power is `r
-length(S) / length(significant$taxon)`.
+At a $q$-level of 0.2, the FDP is `r length(V) / length(R)`. The power is 
+`r length(S) / nrow(significant)`. There are a lot of false positives.

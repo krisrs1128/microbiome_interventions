@@ -119,7 +119,7 @@ nbinom_sampler <- function(size = 1, baseline = 1) {
 generate_sample <- function(theta0, w, z, step_generator, sampler) {
   result <- list()
   n_time <- ncol(w)
-  n_taxa <- nrow(x0)
+  n_taxa <- nrow(theta0)
   P <- step_generator$params$P
   Q <- step_generator$params$Q
   
