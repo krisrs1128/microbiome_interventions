@@ -13,53 +13,50 @@ library(microTF)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
+set.seed(20230313)
 ```
 
 ```{r}
 step_t <- function(f, g, h) {
   fun <- function(x, w, z) {
-    f(x) + g(w) + h(x, w)
+    f$fun(x) + g$fun(w) + h$fun(x, w)
   }
   params <- list(P = f$lag, Q = g$lag, PQ = h$lag)
   list(fun = fun, params = params)
 }
 
-
-f <- linear_sum(5, 1)
-g <- linear_sum(5, 1, 2)
-step_generator <- step_t(f, g, h)
-
-
-
 matnorm <- function(N, M, mu = 0, sigma = 1) {
   matrix(rnorm(N * M, mu, sigma), N, M)
 }
 
-factorized_step <- function(J, K, D = NULL) {
+factorized_step <- function(J, K, D = NULL, ...) {
   if (is.null(D)) {
     D <- J
   }
   
-  Theta <- matnorm(J, K)
-  B <- matnorm(K, D)
+  Theta <- MCMCpack::rdirichlet(J, rep(1, K))
+  B <- matnorm(K, D, ...)
   list(B = B, Theta = Theta)
 }
 
 sparsify <- function(A, sparsity = 0.8) {
-  ix <- sample(length(A), length(A) * sparsity)
-  A[ix] <- 0
+  for (i in seq_along(A)) {
+    ix <- sample(length(A[[i]]), length(A[[i]]) * sparsity)
+    A[[i]][ix] <- 0
+  }
   A
 }
 
-linear_sum <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 2) {
-  coefs <- replicate(n_lag, ~ factorized_step(n_taxa, n_latent, n_perturb))
+linear_sum <- function(coefs) {
+  n_lag <- length(coefs)
+  n_taxa <- nrow(coefs[[1]])
   
   fun <- function(x) {
     result <- matrix(0, n_taxa, 1)
 
     L <- ncol(x)
-    for (l in seq_along(n_lag)) {
-      result <- result + coefs[[l]] %*% x[L - l, ]
+    for (l in seq_len(n_lag)) {
+      result <- result + coefs[[l]] %*% x[, L - l + 1]
     }
 
     result
@@ -68,58 +65,109 @@ linear_sum <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 2) {
   list(fun = fun, lag = n_lag, coefs = coefs)
 }
 
+low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
+  coefs <- list()
+  for (l in seq_len(n_lag)) {
+    coefs[[l]] <- factorized_step(n_taxa, n_latent, n_perturb, ...)
+  }
+  
+  coefs %>%
+    map(~ .$Theta %*% .$B)
+}
 
-interaction_sum <- function(n_taxa, n_latent, n_perturb, n_lag = 2) {
-  coefs <- replicate(n_lag, ~ {
-    result <- list()
-    for (j in seq_len(n_taxa)) {
-      result[[j]] <- factorized_step(n_taxa, n_latent, n_perturb)
-    }
-  })
+normalize <- function(A, lambda = 0.9) {
+  for (i in seq_along(A)) {
+    A[[i]] <- lambda * A[[i]] / max(svd(A[[i]])$d[1])
+  }
+  A
+}
+
+low_rank_step_ <- function(n_taxa, n_latent, n_perturb, n_lag) {
+  coefs <- list()
+  for (j in seq_len(n_taxa)) {
+    coefs[[j]] <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag)
+  }
+  coefs
+}
+
+interaction_sum <- function(coefs) {
+  n_taxa <- length(coefs)
+  n_lag <- length(coefs[[1]])
   
   fun <- function(x, w) {
     result <- matrix(0, n_taxa, 1)
-    L1 <- ncol(x) 
-    L2 <- ncol(w)
-    
-    for (l in seq_along(n_lag)) {
-      for (j in seq_along(n_taxa)) {
-        result <- result + t(x[, L1 - l]) %*% coefs[[j]][[l]] %*% w[, L2 - l]
+ 
+    for (l in seq(n_lag)) {
+      for (j in seq_len(n_taxa)) {
+        result[j, 1] <- result[j, 1] + t(x[, n_lag - l + 1]) %*% coefs[[j]][[l]] %*% w[, n_lag - l + 1]
       }
     }
     result
   }
+  
+  list(fun = fun, PQ = n_lag, coefs = coefs)
 }
 
-gaussian_sampler <- function(theta, sigma = 1) {
-  if (length(sigma) == 1) {
-    sigma <- rep(sigma, length(theta))
-  }
+gaussian_sampler <- function(sigma = 1) {
+  function(theta) {
+    if (length(sigma) == 1) {
+      sigma <- rep(sigma, length(theta))
+    }
   
-  rnorm(theta, sigma)
+    rnorm(length(theta), theta, sigma)
+  }
 }
 
 generate_sample <- function(x0, w, z, step_generator, sampler) {
   result <- list()
   n_time <- ncol(w)
-  P <- step_generator$P
-  Q <- step_generator$Q
+  n_taxa <- nrow(x0)
+  P <- step_generator$params$P
+  Q <- step_generator$params$Q
   
-  x <- x0
-  for (i in seq(max(P, Q), n_time)) {
-    theta <- step_generator$fun(x[, (i - P) : (i - 1)], w[, (i - Q) : i], z)
-    x <- sampler(theta)
+  x <- cbind(x0, matrix(0, n_taxa, n_time - ncol(x0)))
+  for (i in seq(max(P, Q) + 1, n_time)) {
+    theta <- step_generator$fun(x[, (i - P) : (i - 1), drop=F], w[, (i - Q + 1) : i, drop=F], z)
+    x[, i] <- sampler(theta)
   }
   
   x
 }
+```
+
+```{r}
+n_lag <- 3
+n_taxa <- 5
+n_perturb <- 1
+n_latent <- 2
+n_covariates <- 3
+
+A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) %>%
+  sparsify() %>%
+  normalize(0.5)
+B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 4)
+C <- low_rank_step_(n_taxa, n_latent, n_perturb, n_lag)
+for (i in seq_along(C)) {
+  C[[i]] <- C[[i]] %>%
+    sparsify() %>%
+    normalize(0.2)
+}
+```
 
 
+```{r}
+step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C))
+x0 <- matrix(0, n_taxa, n_lag + 1)
+w <- matrix(0, 1, 20)
+w[1, 5:10] <- 1
+z <- rnorm(n_covariates)
+x <- generate_sample(x0, w, z, step_generator, gaussian_sampler(1))
+```
 
 
-
-
-
-
+```{r}
+for (j in seq_len(n_taxa)) {
+  plot(x[j, ])
+}
 ```
 
