@@ -128,25 +128,27 @@ w_df_ <- w_df |>
   filter(w != 0, time > n_lag)
 
 x_df |>
-  filter(taxon == "tax148") |>
+  filter(taxon == "tax331") |>
   ggplot(aes(time, reorder(subject, value))) +
   geom_tile(aes(fill = log(1 + value))) +
   geom_point(data = w_df_, shape = 1) +
   scale_fill_distiller(direction = 1)
 ```
 
+### DESeq2
+
 If we were using DESeq2, how would we test?
 
-```{r, eval = FALSE}
-x_mat <- map_dfc(x, ~ .[, -seq_len(n_lag)]) %>%
+```{r}
+reads <- map_dfc(x, ~ .[, -seq_len(n_lag)]) %>%
   as.matrix()
-rownames(x_mat) <- str_c("tax", seq_len(n_taxa))
-colnames(x_mat) <- w_df %>%
+rownames(reads) <- str_c("tax", seq_len(n_taxa))
+colnames(reads) <- w_df %>%
   filter(time > n_lag) %>%
   pull(sample)
 
 ps <- phyloseq(
-  otu_table(x_mat, taxa_are_rows = TRUE),
+  otu_table(reads, taxa_are_rows = TRUE),
   sample_data(select(w_df, -value) %>% column_to_rownames("sample"))
 )
 
@@ -154,7 +156,7 @@ dds  <- phyloseq_to_deseq2(ps, ~ w)
 dds <- DESeq(dds)
 ```
 
-```{r, eval = FALSE}
+```{r}
 significant <- results(dds) |>
   data.frame() |>
   rownames_to_column("taxon") |>
@@ -167,7 +169,7 @@ significant |>
 These are the taxa that DESeq2 thinks are significant. We've ordered by
 estimated log fold change and colored by the true perturbation effect.
 
-```{r, eval = FALSE}
+```{r}
 x_df |>
   right_join(select(significant, taxon, log2FoldChange, padj) %>% filter(padj < 1e-6)) |>
   filter(subject == 1) |>
@@ -189,3 +191,36 @@ V <- setdiff(significant$taxon, nonnull_taxa_)
 
 At a $q$-level of 0.2, the FDP is `r length(V) / length(R)`. The power is 
 `r length(S) / nrow(significant)`. There are a lot of false positives.
+
+### Mirror-Based Testing
+
+```{r}
+subject_data <- z %>%
+  as_tibble() %>%
+  mutate(subject = row_number())
+
+metadata <- expand.grid(
+    time = seq_len(n_time),
+    subject = seq_len(n_subject)
+  ) %>%
+  mutate(sample = str_c("sam", row_number())) %>%
+  filter(time > n_lag)
+
+interventions <- w_df %>%
+  filter(time > n_lag) %>%
+  pull(w, sample) %>%
+  as.matrix()
+
+ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
+```
+
+split the data and fit a GBM
+
+```{r}
+fit <- train(ts[seq_len(n_subject / 2)], method = "gbm")
+```
+
+compute a mirror statistic on the held out set
+
+rank and make selection to control the false discovery proportion
+

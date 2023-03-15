@@ -43,7 +43,7 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
     series[[i]] <- new(
       "ts_inter_single", 
       values = x[, order(sample_ix)],
-      interventions = z[, order(sample_ix)],
+      interventions = z[, order(sample_ix), drop=FALSE],
       time = sort(sample_ix)
     )
   }
