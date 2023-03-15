@@ -220,11 +220,50 @@ split the data and fit a GBM
 fit <- train(ts[seq_len(n_subject / 2)], method = "gbm")
 ```
 
-compute a mirror statistic on the held out set
-
-rank and make selection to control the false discovery proportion
+Let's create some example counterfactual series from which to generate mirror
+statistics. We will want to ensure that the mirrors are in fact symmetric in the
+null cases.
 
 ```{r}
-#y_hat <- predict(fit, ts[seq(n_subject / 2 + 1, n_subject)])
-# we need to feed in the first few timesteps before prediction
+n_time <- 25
+n_taxa <- 500
+n_nonnull <- 5
+splits <- list(
+  list(y0 = matrix(rnorm(n_time * n_taxa), n_taxa, n_time)),
+  list(y0 = matrix(rnorm(n_time * n_taxa), n_taxa, n_time))
+)
+
+y11 <- splits[[1]]$y0 + rnorm(length(splits[[1]]$y0), 0, 1)
+signal <- 10
+y11[seq_len(n_nonnull), 1:5] <- y11[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, .5)
+
+y21 <- splits[[2]]$y0 + rnorm(length(splits[[2]]$y0), 0, 1)
+y21[seq_len(n_nonnull), 1:5] <- y11[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, 0.5)
+
+splits[[1]]$y1 <- y11
+splits[[2]]$y1 <- y21
+
+for (j in seq_len(5)) {
+  plot(splits[[2]]$y1[j, ])
+  points(splits[[2]]$y0[j, ], col = "red")
+}
 ```
+
+
+
+```{r}
+temporal_mirror <- function(splits) {
+  tau <- map(splits, ~ .$y1 - .$y0)
+  int_tau <- map(tau, rowSums)
+  sgn <- sign(int_tau[[1]] * int_tau[[2]])
+  
+  int_abs_tau <- map(tau, ~ rowMeans(abs(.)))
+  magnitude <- int_abs_tau[[1]] + int_abs_tau[[2]]
+  
+  sgn * magnitude
+}
+
+m <- temporal_mirror(splits)
+hist(m, 100)
+```
+What if we have a different pairs / split for each person?
