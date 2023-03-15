@@ -83,7 +83,7 @@ for (i in seq_len(n_subject)) {
 Next, we can plot the series.
 
 ```{r}
-x_df <- map_dfr(x, ~ as_tibble(.) %>% rownames_to_column("taxon"), .id = "subject") |>
+x_df <- map_dfr(x, ~ as_tibble(.) |> rownames_to_column("taxon"), .id = "subject") |>
   pivot_longer(starts_with("V"), names_to = "time") |>
   mutate(
     time = as.integer(str_remove(time, "V")),
@@ -98,7 +98,7 @@ B_df <- map_dfr(
   pivot_wider(names_from = "lag", values_from = "V1")
 
 x_df <- x_df |>
-  left_join(B_df) %>%
+  left_join(B_df) |>
   mutate(effect = rowSums(.[, -c(1:4)]))
   
 start_ix <- min(which(w[[1]][1, ] == 1))
@@ -140,16 +140,16 @@ x_df |>
 If we were using DESeq2, how would we test?
 
 ```{r}
-reads <- map_dfc(x, ~ .[, -seq_len(n_lag)]) %>%
+reads <- map_dfc(x, ~ .[, -seq_len(n_lag)]) |>
   as.matrix()
 rownames(reads) <- str_c("tax", seq_len(n_taxa))
-colnames(reads) <- w_df %>%
-  filter(time > n_lag) %>%
+colnames(reads) <- w_df |>
+  filter(time > n_lag) |>
   pull(sample)
 
 ps <- phyloseq(
   otu_table(reads, taxa_are_rows = TRUE),
-  sample_data(select(w_df, -value) %>% column_to_rownames("sample"))
+  sample_data(select(w_df, -value) |> column_to_rownames("sample"))
 )
 
 dds  <- phyloseq_to_deseq2(ps, ~ w)
@@ -171,7 +171,7 @@ estimated log fold change and colored by the true perturbation effect.
 
 ```{r}
 x_df |>
-  right_join(select(significant, taxon, log2FoldChange, padj) %>% filter(padj < 1e-6)) |>
+  right_join(select(significant, taxon, log2FoldChange, padj) |> filter(padj < 1e-6)) |>
   filter(subject == 1) |>
   ggplot() +
   geom_rect(xmin = start_ix, xmax = end_ix, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
@@ -195,20 +195,20 @@ At a $q$-level of 0.2, the FDP is `r length(V) / length(R)`. The power is
 ### Mirror-Based Testing
 
 ```{r}
-subject_data <- z %>%
-  as_tibble() %>%
+subject_data <- z |>
+  as_tibble() |>
   mutate(subject = row_number())
 
 metadata <- expand.grid(
     time = seq_len(n_time),
     subject = seq_len(n_subject)
-  ) %>%
-  mutate(sample = str_c("sam", row_number())) %>%
+  ) |>
+  mutate(sample = str_c("sam", row_number())) |>
   filter(time > n_lag)
 
-interventions <- w_df %>%
-  filter(time > n_lag) %>%
-  pull(w, sample) %>%
+interventions <- w_df |>
+  filter(time > n_lag) |>
+  pull(w, sample) |>
   as.matrix()
 
 ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
@@ -224,3 +224,7 @@ compute a mirror statistic on the held out set
 
 rank and make selection to control the false discovery proportion
 
+```{r}
+#y_hat <- predict(fit, ts[seq(n_subject / 2 + 1, n_subject)])
+# we need to feed in the first few timesteps before prediction
+```

@@ -5,23 +5,53 @@ date: "`r Sys.Date()`"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, out.width = 400, fig.height = 4, fig.width = 8)
 ```
 
 ```{r}
 library(tidyverse)
 theme_set(theme_bw())
+set.seed(20230315)
 ```
+
+We'll use these functions.
+
+```{r}
+sample_m <- function(n0, n1, mu = 2) {
+  tibble(
+    m = c(rnorm(n0), rnorm(n1, mu)),
+    nonnull = c(rep(FALSE, n0), rep(TRUE, n1))
+  )
+}
+
+fdp_hat <- function(m) {
+  m_sort <- sort(abs(m))
+  fdp <- tibble(t = m_sort, fdp = 0)
+  
+  for (j in seq_along(m_sort)) {
+    fdp$fdp[j] <- sum(m < -m_sort[j]) / sum(m > m_sort[j])
+  }
+  
+  fdp
+}
+
+tau_q <- function(fdp, q) {
+  fdp |>
+    filter(fdp < q) |>
+    slice_min(t) |>
+    pull(t)
+}
+```
+
 
 Here are some idealized mirror statistics.
 
 ```{r}
 n0 <- 800
 n1 <- 200
-m <- tibble(
-  m = c(rnorm(n0), rnorm(n1, 3)),
-  nonnull = c(rep(FALSE, n0), rep(TRUE, n1))
-)
+
+
+m <- sample_m(n0, n1)
 
 ggplot(m) +
   geom_histogram(
@@ -34,27 +64,6 @@ ggplot(m) +
 We can compute an FDR estimator from them.
 
 ```{r}
-fdp_hat <- function(m) {
-  m_sort <- sort(abs(m))
-  fdp <- tibble(t = m_sort, fdp = 0)
-  
-  for (j in seq_along(m_sort)) {
-    fdp$fdp[j] <- sum(m < -m_sort[j]) / sum(m > m_sort[j])
-  }
-  
-  fdp
-}
-
-```
-
-```{r}
-tau_q <- function(fdp, q) {
-  fdp |>
-    filter(fdp < q) |>
-    slice_min(t) |>
-    pull(t)
-}
-
 fdp <- fdp_hat(m$m)
 tau <- tau_q(fdp, 0.1)
 
@@ -66,12 +75,12 @@ ggplot(fdp) +
 
 ```{r}
 selections <- function(m, tau) {
-  which(m > tau)
+  m > tau
 }
 
 s_hat <- selections(m, tau)
 m <- m |>
-  mutate(nonnull_hat = row_number() %in% s_hat)
+  mutate(nonnull_hat = s_hat)
 
 errors <- m |>
   count(nonnull, nonnull_hat)
@@ -79,4 +88,54 @@ errors <- m |>
 errors
 errors$n[2] / (errors$n[2] + errors$n[4]) # actual FDP
 errors$n[4] / (errors$n[3] + errors$n[4]) # actual power
+```
+
+If we use multiple data splitting, then we supposedly can improve power. We'll
+imagine this by creating many different m's.
+
+```{r}
+inclusion <- function(s_hat) {
+  s_hat <- 1.0 * s_hat
+  colMeans(s_hat / rowSums(s_hat))
+}
+
+consolidate <- function(s_hat, q) {
+  I_hat <- inclusion(s_hat)
+  ix <- order(I_hat)
+  I_sort <- cumsum(I_hat[ix])
+  j_star <- max(which(I_sort <= q))
+  I_hat > I_hat[ix[j_star]]
+}
+
+multiple_data_splitting <- function(ms, q) {
+  s_hat <- matrix(FALSE, length(ms), length(ms[[1]]))
+  
+  for (k in seq_along(ms)) {
+   fdp <- fdp_hat(ms[[k]])
+   tau <- tau_q(fdp, q)
+   s_hat[k, ] <- selections(ms[[k]], tau)
+  }
+  
+  consolidate(s_hat, q)
+}
+
+ms <- replicate(20, sample_m(n0, n1), simplify = FALSE)
+s_hat <- multiple_data_splitting(map(ms, ~ .$m), 0.1)
+
+m <- m |>
+  mutate(nonnull_mds = s_hat)
+
+errors <- m |>
+  mutate(
+    nonnull = factor(nonnull, levels = c("TRUE", "FALSE")),
+    nonnull_mds = factor(nonnull_mds, levels = c("TRUE", "FALSE"))
+  ) |>
+  count(nonnull, nonnull_mds, .drop = FALSE)
+```
+
+
+```{r}
+errors
+errors$n[3] / (errors$n[3] + errors$n[4]) # actual FDP
+errors$n[1] / (errors$n[1] + errors$n[2]) # actual power
 ```

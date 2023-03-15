@@ -17,7 +17,6 @@ factorized_step <- function(J, K, D = NULL, ...) {
     D <- J
   }
   
-  #Theta <- rdirichlet(J, rep(1, K))
   Theta <- matnorm(J, K, ...)
   B <- matnorm(K, D, ...)
   list(B = B, Theta = Theta)
