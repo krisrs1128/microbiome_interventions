@@ -63,10 +63,9 @@ samples <- samples |>
 
 save(samples, reads, interventions, subject_data, taxonomy, file = "data/diet_study.rda")
 ```
-<<<<<<< HEAD
-=======
 
 ```{r}
+ts_inter <- ts_from_dfs(reads, interventions, samples, subject_data)
 values(ts_inter[[1]])
 interventions(ts_inter[[1]])
 ts_inter[[1]]@time
