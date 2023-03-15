@@ -250,9 +250,35 @@ for (j in seq_len(5)) {
 ```
 
 
+```{r}
+matnorm <- function(n, m, mu = 0, sd = 1) {
+  matrix(rnorm(n * m, mu, sd), n, m)
+}
+
+n_subject <- 50
+n_time <- 10
+n_taxa <- 500
+n_nonnull <- 5
+signal <- 1 
+splits <- list(
+  replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F),
+  replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F)
+)
+
+for (s in seq_along(splits)) {
+  for (i in seq_along(splits[[s]])) {
+    splits[[s]][[i]]$y1 <- splits[[s]][[i]]$y0 + rnorm(length(splits[[s]][[i]]$y0), 0, 1)
+    splits[[s]][[i]]$y1[seq_len(n_nonnull), 1:5] <- splits[[s]][[i]]$y1[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, 1)
+  }
+  
+}
+
+plot(splits[[1]][[1]]$y1[1, ], col = "red")
+points(splits[[1]][[1]]$y0[1, ])
+```
 
 ```{r}
-temporal_mirror <- function(splits) {
+temporal_mirror_ <- function(splits) {
   tau <- map(splits, ~ .$y1 - .$y0)
   int_tau <- map(tau, rowSums)
   sgn <- sign(int_tau[[1]] * int_tau[[2]])
@@ -263,7 +289,37 @@ temporal_mirror <- function(splits) {
   sgn * magnitude
 }
 
-m <- temporal_mirror(splits)
+# organization is like this
+# splits
+#  split1
+#    subject1
+#      y0
+#      y1
+#    subject2
+#      y0
+#      y1
+#    subject3
+#      y0
+#      y1
+#  split2
+#    y0
+#    y1
+
+tau_summaries <- function(split) {
+  int <- do.call(cbind, map(split, ~ rowSums(.$y1 - .$y0)))
+  int_abs <- do.call(cbind, map(split, ~ rowSums(abs(.$y1 - .$y0))))
+  list(int = int, int_abs = int_abs)
+}
+
+temporal_mirror2 <- function(splits) {
+  tau <- map(splits, tau_summaries)
+  sgn <- rowMeans(sign(tau[[1]]$int * tau[[2]]$int))
+  magnitude <- rowMeans(tau[[1]]$int_abs + tau[[2]]$int_abs)
+  sgn * magnitude
+}
+
+m <- temporal_mirror2(splits)
+print(m[1:n_nonnull])
 hist(m, 100)
 ```
 What if we have a different pairs / split for each person?
