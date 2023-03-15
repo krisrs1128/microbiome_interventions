@@ -1,0 +1,82 @@
+---
+title: "Mirror Example"
+output: pagedown::book_crc
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+theme_set(theme_bw())
+```
+
+Here are some idealized mirror statistics.
+
+```{r}
+n0 <- 800
+n1 <- 200
+m <- tibble(
+  m = c(rnorm(n0), rnorm(n1, 3)),
+  nonnull = c(rep(FALSE, n0), rep(TRUE, n1))
+)
+
+ggplot(m) +
+  geom_histogram(
+    aes(m, fill = nonnull), 
+    bins = 50,
+    alpha = 0.8, position = "identity"
+  )
+```
+
+We can compute an FDR estimator from them.
+
+```{r}
+fdp_hat <- function(m) {
+  m_sort <- sort(abs(m))
+  fdp <- tibble(t = m_sort, fdp = 0)
+  
+  for (j in seq_along(m_sort)) {
+    fdp$fdp[j] <- sum(m < -m_sort[j]) / sum(m > m_sort[j])
+  }
+  
+  fdp
+}
+
+```
+
+```{r}
+tau_q <- function(fdp, q) {
+  fdp |>
+    filter(fdp < q) |>
+    slice_min(t) |>
+    pull(t)
+}
+
+fdp <- fdp_hat(m$m)
+tau <- tau_q(fdp, 0.1)
+
+ggplot(fdp) +
+  geom_point(aes(t, fdp)) +
+  geom_vline(xintercept = tau) +
+  geom_hline(yintercept = 0.1)
+```
+
+```{r}
+selections <- function(m, tau) {
+  which(m > tau)
+}
+
+s_hat <- selections(m, tau)
+m <- m |>
+  mutate(nonnull_hat = row_number() %in% s_hat)
+
+errors <- m |>
+  count(nonnull, nonnull_hat)
+
+errors
+errors$n[2] / (errors$n[2] + errors$n[4]) # actual FDP
+errors$n[4] / (errors$n[3] + errors$n[4]) # actual power
+```
