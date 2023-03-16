@@ -25,16 +25,18 @@ n_subject <- 20
 n_time <- 30
 n_lag <- 5
 #n_taxa <- 500
-n_taxa <- 10
+n_taxa <- 50
 n_perturb <- 1
 n_latent <- 5
 n_covariates <- 3
-prop_nonnull <- 0.1
+#prop_nonnull <- 0.1
+prop_nonnull <- 0.2
 
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
  sparsify() |>
  normalize(0.8)
-B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 0.5)
+#B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 0.5)
+B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 1)
 
 nonnull_taxa <- sample(n_taxa, prop_nonnull * n_taxa)
 for (i in seq_along(B)) {
@@ -77,7 +79,6 @@ for (i in seq_len(n_subject)) {
   x[[i]] <- generate_sample(theta0, w[[i]], z[i, ], step_generator, nbinom_sampler(sizes, baselines))
   rownames(x[[i]]) <- str_c("tax", seq_len(n_taxa))
 }
-
 ```
 
 Next, we can plot the series.
@@ -315,11 +316,11 @@ splits.
 
 ```{r}
 ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
-ts <- ts[1:5]
 
 synthetic_control <- function(ts, n_lag = 4, ...) {
   fit <- train(ts, ...)
   controls <- ts
+  print("training")
   
   for (i in seq_along(ts)) {
     w <- interventions(ts[[i]])
@@ -333,6 +334,7 @@ synthetic_control <- function(ts, n_lag = 4, ...) {
     values(controls[[i]]) <- v[, seq_len(first_inter)]
   }
   
+  print("prediction")
   predict(fit, controls)
 }
 
@@ -357,6 +359,36 @@ for (s in seq_along(split_inter)) {
       y0 = values(split_inter[[s]]$control[[i]])
     )
   }
+  splits[[s]] <-  split_s
 }
+```
+
+```{r}
+# a few of the taxa with actual differences
+for (i in nonnull_taxa) {
+  plot(splits[[1]][[1]]$y0[i, ])
+  points(splits[[1]][[1]]$y1[i, ], col = "red")
+}
+```
+
+
+```{r}
+# and a few with no åctual difference
+for (i in seq(setdiff(1:5, nonnull_taxa))) {
+  plot(splits[[1]][[1]]$y0[i, ])
+  points(splits[[1]][[1]]$y1[i, ], col = "red")
+}
+```
+
+```{r}
+m <- temporal_mirror(splits) %>%
+  as_tibble() %>%
+  mutate(truth = row_number() %in% nonnull_taxa) %>%
+  dplyr::rename(m = value) %>%
+  arrange(m) %>%
+  mutate(ix = row_number())
+
+ggplot(m) +
+  geom_point(aes(ix, m, col = truth))
 ```
 

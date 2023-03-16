@@ -90,12 +90,8 @@ y_hat <- predict(fit, stest)
 ```{r}
 y_hat_df <- tidy_ts(y_hat)$x %>%
   rename(prediction = value)
-y_df <- tidy_ts(stest)
+y_df <- tidy_ts(result)
 ```
-
-
-
-
 
 ```{r}
 compare_df <- y_hat_df %>%
@@ -107,12 +103,12 @@ compare_df <- y_hat_df %>%
 
 ```{r, fig.width = 10, fig.height = 5}
 ggplot(
-  compare_df %>% filter(as.numeric(subject) < 6),
+  compare_df %>% filter(as.numeric(subject) < 4),
   aes(time, value, col = type)
   ) +
   geom_point() +
-  geom_vline(data = compare_df %>% filter(as.numeric(subject) < 6, indicator == 1), aes(xintercept = time)) +
-  facet_grid(subject ~ reorder(taxon, value), scales = "free_y") +
+  geom_vline(data = compare_df %>% filter(as.numeric(subject) < 4, indicator == 1), aes(xintercept = time)) +
+  facet_grid(reorder(taxon, value) ~ subject, scales = "free_y") +
   scale_color_manual(values = c("#5C51A6", "#8C1C03"))
 ```
 

@@ -130,5 +130,4 @@ tr_fun <- function(method, hyper = list()) {
 
 mdsine_result <- cross_validate(ts, tr_fun("mdsine", hyper))
 gbm_result <- cross_validate(ts, tr_fun("gbm"))
-
 ```
