@@ -52,7 +52,7 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   if (!is.null(subject_data)) {
     names(series) <- subjects
     subject_data <- metadata %>%
-      select(subject) %>%
+      distinct(subject) %>%
       left_join(subject_data)
   }
   

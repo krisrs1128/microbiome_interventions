@@ -98,13 +98,19 @@ time_lags <- function(fit) {
   c(P, Q)
 }
 
-predictors <- function(ts_inter, z_next, lags) {
+predictors <- function(ts_inter, z_next, lags, subject) {
   x <- values(ts_inter)
   z <- interventions(ts_inter)
   x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
   z_prev <- cbind(z[, seq(ncol(z) - lags[2] + 2, ncol(z)), drop = FALSE], z_next)
   
-  cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) |>
+  xz <- cbind(matrix(x_prev, nrow = 1), matrix(z_prev, nrow = 1)) |>
     as.data.frame() |>
     set_names(predictor_names(dim(x_prev), dim(z_prev)))
+  
+  if (!is.null(subject)) {
+    xz  <- cbind(xz, subject[rep(1, nrow(xz)), ])
+  }
+  
+  xz
 }

@@ -18,7 +18,7 @@ gbm_predict <- function(object, newdata) {
     new_interventions[[i]] <- split_data$interventions
   }
 
-  newdata <- new("ts_inter", series = series)
+  newdata <- new("ts_inter", series = series, subject_data = subject_data(newdata))
   gbm_predict_(fit, newdata, new_interventions)
 }
 
@@ -31,26 +31,29 @@ gbm_predict_ <- function(fit, ts_inter, new_interventions) {
 
   result <- list()
   for (i in seq_along(ts_inter)) {
-    result[[i]] <- gbm_predict_single(fit, ts_inter[[i]], new_interventions[[i]], lags)
+    result[[i]] <- gbm_predict_single(
+      fit, 
+      ts_inter[[i]], 
+      new_interventions[[i]], 
+      lags, 
+      subject_data(ts_inter)[i,, drop = FALSE]
+    )
   }
 
   new("ts_inter", series = result)
 }
 
 #' @export
-gbm_predict_single <- function(fit, ts_inter, new_interventions, lags) {
+gbm_predict_single <- function(fit, ts_inter, new_interventions, lags, subject = NULL) {
   for (h in seq_len(ncol(new_interventions))) {
-    ts_inter <- gbm_predict_step(ts_inter, fit, new_interventions[, h, drop = FALSE], lags)
+    ts_inter <- gbm_predict_step(ts_inter, fit, new_interventions[, h, drop = FALSE], lags, subject)
   }
   ts_inter
 }
 
 #' @export
-gbm_predict_step <- function(ts_inter, fit, z_next, lags) {
-  browser()
-  # this should be using the patchify code somehow, but I'm not exactly sure how
-  
-  xz <- predictors(ts_inter, z_next, lags)
+gbm_predict_step <- function(ts_inter, fit, z_next, lags, subject = NULL) {
+  xz <- predictors(ts_inter, z_next, lags, subject)
   y_hat <- vector(length = nrow(ts_inter))
   for (j in seq_len(nrow(ts_inter))) {
     y_hat[j] <- predict(fit[[j]], xz)
