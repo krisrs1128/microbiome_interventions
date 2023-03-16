@@ -9,11 +9,10 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(microTF)
 library(tidyverse)
 library(phyloseq)
 library(DESeq2)
-source("../microTF/R/simulate_dynamics.R")
+library(microTF)
 theme_set(theme_bw())
 set.seed(20230313)
 ```
@@ -25,7 +24,8 @@ interactions.
 n_subject <- 20
 n_time <- 30
 n_lag <- 5
-n_taxa <- 500
+#n_taxa <- 500
+n_taxa <- 10
 n_perturb <- 1
 n_latent <- 5
 n_covariates <- 3
@@ -98,7 +98,7 @@ B_df <- map_dfr(
   pivot_wider(names_from = "lag", values_from = "V1")
 
 x_df <- x_df |>
-  left_join(B_df) |>
+  left_join(B_df) %>%
   mutate(effect = rowSums(.[, -c(1:4)]))
   
 start_ix <- min(which(w[[1]][1, ] == 1))
@@ -251,15 +251,27 @@ for (j in seq_len(5)) {
 
 
 ```{r}
-matnorm <- function(n, m, mu = 0, sd = 1) {
-  matrix(rnorm(n * m, mu, sd), n, m)
-}
-
 n_subject <- 50
 n_time <- 10
 n_taxa <- 500
 n_nonnull <- 5
 signal <- 1 
+
+# organization is like this
+# splits
+#  split1
+#    subject1
+#      y0
+#      y1
+#    subject2
+#      y0
+#      y1
+#    subject3
+#      y0
+#      y1
+#  split2
+#    y0
+#    y1
 splits <- list(
   replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F),
   replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F)
@@ -278,48 +290,73 @@ points(splits[[1]][[1]]$y0[1, ])
 ```
 
 ```{r}
-temporal_mirror_ <- function(splits) {
-  tau <- map(splits, ~ .$y1 - .$y0)
-  int_tau <- map(tau, rowSums)
-  sgn <- sign(int_tau[[1]] * int_tau[[2]])
-  
-  int_abs_tau <- map(tau, ~ rowMeans(abs(.)))
-  magnitude <- int_abs_tau[[1]] + int_abs_tau[[2]]
-  
-  sgn * magnitude
-}
-
-# organization is like this
-# splits
-#  split1
-#    subject1
-#      y0
-#      y1
-#    subject2
-#      y0
-#      y1
-#    subject3
-#      y0
-#      y1
-#  split2
-#    y0
-#    y1
-
 tau_summaries <- function(split) {
   int <- do.call(cbind, map(split, ~ rowSums(.$y1 - .$y0)))
   int_abs <- do.call(cbind, map(split, ~ rowSums(abs(.$y1 - .$y0))))
   list(int = int, int_abs = int_abs)
 }
 
-temporal_mirror2 <- function(splits) {
+temporal_mirror <- function(splits) {
   tau <- map(splits, tau_summaries)
   sgn <- rowMeans(sign(tau[[1]]$int * tau[[2]]$int))
   magnitude <- rowMeans(tau[[1]]$int_abs + tau[[2]]$int_abs)
   sgn * magnitude
 }
 
-m <- temporal_mirror2(splits)
-print(m[1:n_nonnull])
+m <- temporal_mirror(splits)
+print(m[1:(2 * n_nonnull)])
 hist(m, 100)
 ```
-What if we have a different pairs / split for each person?
+
+Now, how can we get the y1 and y0 for each person across the two splits? Note
+that we don't have to apply the model to the test split (unlike everything else
+we've been taught) -- it's going to be enough to ensure sign consistency across
+splits.
+
+```{r}
+ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
+ts <- ts[1:5]
+
+synthetic_control <- function(ts, n_lag = 4, ...) {
+  fit <- train(ts, ...)
+  controls <- ts
+  
+  for (i in seq_along(ts)) {
+    w <- interventions(ts[[i]])
+    w_ <- matrix(0, nrow(w), ncol(w))
+    colnames(w_) <- colnames(w)
+    rownames(w_) <- rownames(w)
+    interventions(controls[[i]]) <- w_
+    
+    first_inter <- max(n_lag, min(which(colSums(w) != 0)))
+    v <- values(controls[[i]])
+    values(controls[[i]]) <- v[, seq_len(first_inter)]
+  }
+  
+  predict(fit, controls)
+}
+
+split_ix <- sample(length(ts), 0.5 * length(ts))
+split_inter <- list(
+  list(
+    ts = ts[split_ix],
+    control = synthetic_control(ts[split_ix], method = "gbm")
+  ),
+  list(
+    ts = ts[-split_ix],
+    control = synthetic_control(ts[-split_ix], method = "gbm")
+  )
+)
+
+splits <- list()
+for (s in seq_along(split_inter)) {
+  split_s <- list()
+  for (i in seq_along(split_inter[[s]]$ts)) {
+    split_s[[i]] <- list(
+      y1 = values(split_inter[[s]]$ts[[i]]),
+      y0 = values(split_inter[[s]]$control[[i]])
+    )
+  }
+}
+```
+

@@ -1,4 +1,5 @@
 
+#' @export
 step_t <- function(f, g, h) {
   fun <- function(x, w, z) {
     f$fun(x) + g$fun(w) + h$fun(x, w)
@@ -7,6 +8,7 @@ step_t <- function(f, g, h) {
   list(fun = fun, params = params)
 }
 
+#' @export
 matnorm <- function(N, M, mu = 0, sigma = 1) {
   matrix(rnorm(N * M, mu, sigma), N, M)
 }
@@ -22,6 +24,7 @@ factorized_step <- function(J, K, D = NULL, ...) {
   list(B = B, Theta = Theta)
 }
 
+#' @export
 sparsify <- function(A, sparsity = 0.8) {
   for (i in seq_along(A)) {
     ix <- sample(length(A[[i]]), length(A[[i]]) * sparsity)
@@ -30,6 +33,7 @@ sparsify <- function(A, sparsity = 0.8) {
   A
 }
 
+#' @export
 linear_sum <- function(coefs) {
   n_lag <- length(coefs)
   n_taxa <- nrow(coefs[[1]])
@@ -48,6 +52,7 @@ linear_sum <- function(coefs) {
   list(fun = fun, lag = n_lag, coefs = coefs)
 }
 
+#' @export
 low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
   coefs <- list()
   for (l in seq_len(n_lag)) {
@@ -58,6 +63,7 @@ low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
     map(~ .$Theta %*% .$B)
 }
 
+#' @export
 normalize <- function(A, lambda = 0.9) {
   for (i in seq_along(A)) {
     A[[i]] <- lambda * A[[i]] / max(svd(A[[i]])$d[1])
@@ -65,6 +71,7 @@ normalize <- function(A, lambda = 0.9) {
   A
 }
 
+#' @export
 low_rank_step_ <- function(n_taxa, n_latent, n_perturb, n_lag) {
   coefs <- list()
   for (j in seq_len(n_taxa)) {
@@ -73,6 +80,7 @@ low_rank_step_ <- function(n_taxa, n_latent, n_perturb, n_lag) {
   coefs
 }
 
+#' @export
 interaction_sum <- function(coefs) {
   n_taxa <- length(coefs)
   n_lag <- length(coefs[[1]])
@@ -91,6 +99,7 @@ interaction_sum <- function(coefs) {
   list(fun = fun, PQ = n_lag, coefs = coefs)
 }
 
+#' @export
 gaussian_sampler <- function(sigma = 1) {
   function(theta) {
     if (length(sigma) == 1) {
@@ -101,6 +110,7 @@ gaussian_sampler <- function(sigma = 1) {
   }
 }
 
+#' @export
 nbinom_sampler <- function(size = 1, baseline = 1) {
   function(log_theta) {
     if (length(size) == 1) {
@@ -115,6 +125,7 @@ nbinom_sampler <- function(size = 1, baseline = 1) {
   }
 }
 
+#' @export
 generate_sample <- function(theta0, w, z, step_generator, sampler) {
   result <- list()
   n_time <- ncol(w)

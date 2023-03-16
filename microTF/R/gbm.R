@@ -47,6 +47,9 @@ gbm_predict_single <- function(fit, ts_inter, new_interventions, lags) {
 
 #' @export
 gbm_predict_step <- function(ts_inter, fit, z_next, lags) {
+  browser()
+  # this should be using the patchify code somehow, but I'm not exactly sure how
+  
   xz <- predictors(ts_inter, z_next, lags)
   y_hat <- vector(length = nrow(ts_inter))
   for (j in seq_len(nrow(ts_inter))) {
