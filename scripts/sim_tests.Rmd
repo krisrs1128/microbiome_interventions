@@ -14,17 +14,17 @@ library(phyloseq)
 library(DESeq2)
 library(microTF)
 theme_set(theme_bw())
-set.seed(20230313)
+set.seed(20230317)
 ```
 
 This generates the coefficient matrices for dynamics, perturbations, and
 interactions.
 
 ```{r}
-n_subject <- 50
+n_subject <- 100
 n_time <- 30
-n_lag <- 5
-n_taxa <- 100
+n_lag <- 3
+n_taxa <- 10
 #n_taxa <- 100
 n_perturb <- 1
 n_latent <- 2
@@ -251,10 +251,10 @@ pdp_generator <- function(ts, lags, qs = c(0.25, 0.5, 0.75), ...) {
 
 new_x <- tibble(
   intervention1_lag0 = c(1, 0), 
-  intervention1_lag1 = c(1, 0),
-  intervention1_lag2 = c(1, 0),
-  intervention1_lag3 = c(1, 0),
-  intervention1_lag4 = c(1, 0)
+  intervention1_lag1 = c(0, 0),
+  intervention1_lag2 = c(0, 0),
+  intervention1_lag3 = c(0, 0),
+  intervention1_lag4 = c(0, 0)
 )
 
 pdps <- list()
@@ -262,6 +262,7 @@ pdp_fun <- pdp_generator(ts, c(n_lag, n_lag))
 
 k <- 1
 for (s in seq_len(100)) {
+  print(s)
   split_ix <- sample(seq_along(ts), 0.5 * length(ts))
   hyper <- list(P = n_lag, Q = n_lag)
   fits <- list(
@@ -286,22 +287,27 @@ pdps0 <- pdps
 
 
 ```{r}
-pdps0 <- bind_rows(pdps0) %>%
+bind_rows(pdps0) %>%
+  select(multisplit, split, taxon, index, mean) %>%
+  pivot_wider(names_from = index, values_from = mean) %>%
+  mutate(difference = `1` - `2`) %>%
+  ggplot() +
+  geom_vline(xintercept = 0) +
+  geom_point(aes(difference, reorder(taxon, difference), col = as.factor(split)), position = position_jitter(h = 0.1))
+```
+
+```{r}
+bind_rows(pdps0) %>%
   select(multisplit, split, taxon, index, mean) %>%
   pivot_wider(names_from = index, values_from = mean) %>%
   mutate(difference = `1` - `2`) %>%
   select(multisplit, split, taxon, difference) %>%
-  pivot_wider(names_from = split, values_from = difference)
-
-ggplot(pdps0) +
-  geom_histogram(aes(`1` - `2`), bins = 10) +
-  geom_vline(xintercept = 0, col = "orange") +
-  facet_wrap(~ taxon, scales = "free")
+  pivot_wider(names_from = split, values_from = difference) %>%
+  mutate(sign = sign(`1` * `2`), magnitude = 0.5 * (`1` + `2`)) %>%
+  group_by(taxon) %>%
+  summarise(m_sign = mean(sign), m_magnitude = mean(magnitude)) %>%
+  arrange(-m_sign, -m_magnitude)
 ```
-
-
-
-
 
 ```{r}
 splits <- split_estimates(ts, 2)
