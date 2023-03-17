@@ -15,7 +15,7 @@ temporal_mirror <- function(splits) {
 }
 
 #' @export
-hypothetical <- function(ts, n_lag = 5, ...) {
+hypothetical <- function(ts, perturb_len = 0, n_lag = 5, ...) {
   fit <- train(ts, ...)
   imagined <- ts
   
@@ -24,31 +24,35 @@ hypothetical <- function(ts, n_lag = 5, ...) {
     w_ <- matrix(0, nrow(w), ncol(w))
     colnames(w_) <- colnames(w)
     rownames(w_) <- rownames(w)
-    interventions(controls[[i]]) <- w_
     
-    # simulate control forward from the first perturbation
+    # simulate hypothetical forward from the first perturbation
     perturb_ix <- which(colSums(w) != 0)
     if (length(perturb_ix) == 0 || min(perturb_ix) < n_lag) {
       first_inter <- n_lag
     } else {
       first_inter <- min(perturb_ix)
     }
+
+    if (perturb_len > 0) {
+      w_[, seq(first_inter, min(first_inter + perturb_len, ncol(w_)))] <- 1
+    }
     
-    v <- values(controls[[i]])
-    values(controls[[i]]) <- v[, seq_len(first_inter)]
+    interventions(imagined[[i]]) <- w_
+    v <- values(imagined[[i]])
+    values(imagined[[i]]) <- v[, seq_len(first_inter)]
   }
   
-  predict(fit, controls)
+  predict(fit, imagined)
 }
 
-rearrange_counterfactual <- function(y0) {
+rearrange_counterfactual <- function(counter) {
   splits <- list()
-  for (s in seq_along(y0)) {
+  for (s in seq_along(counter)) {
     split_s <- list()
-    for (i in seq_along(y0[[s]]$ts)) {
+    for (i in seq_along(counter[[s]]$y0)) {
       split_s[[i]] <- list(
-        y1 = values(y0[[s]]$treatment[[i]]),
-        y0 = values(y0[[s]]$control[[i]])
+        y1 = values(counter[[s]]$y1[[i]]),
+        y0 = values(counter[[s]]$y0[[i]])
       )
     }
     splits[[s]] <-  split_s
@@ -56,22 +60,22 @@ rearrange_counterfactual <- function(y0) {
   splits
 }
 
-split_estimates_ <- function(ts, split_ix, ...) {
+split_estimates_ <- function(ts, split_ix, perturb_len = 5, ...) {
   counterfactual <- list(
-    list(ts = hypothetical(ts[split_ix], "treatment", ...), control = hypothetical(ts[split_ix], "control", ...)),
-    list(ts = hypothetical(ts[-split_ix], "treatment", ...), control = hypothetical(ts[-split_ix], "control", ...))
+    list(y1 = hypothetical(ts[split_ix], perturb_len, ...), y0 = hypothetical(ts[split_ix], ...)),
+    list(y1 = hypothetical(ts[-split_ix], perturb_len, ...), y0 = hypothetical(ts[-split_ix], ...))
   )
   
   rearrange_counterfactual(counterfactual)
 }
 
 #' @export
-split_estimates <- function(ts, n_splits = 1, method = "gbm") {
+split_estimates <- function(ts, n_splits = 1, perturb_len = 5, method = "gbm") {
   splits <- list()
   for (s in seq_len(n_splits)) {
     print(str_c("Evaluating split ", s))
     split_ix <- sample(length(ts), 0.5 * length(ts))
-    splits[[s]] <- split_estimates_(ts, split_ix, method = method)
+    splits[[s]] <- split_estimates_(ts, split_ix, perturb_len, method = method)
   }
   
   splits

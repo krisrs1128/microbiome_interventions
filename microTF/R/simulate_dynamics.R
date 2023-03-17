@@ -13,14 +13,19 @@ matnorm <- function(N, M, mu = 0, sigma = 1) {
   matrix(rnorm(N * M, mu, sigma), N, M)
 }
 
+#' @export
+matunif <- function(N, M, lower = -1, upper = 1) {
+  matrix(runif(N * M, lower, upper), N, M)
+}
+
 #' @importFrom MCMCpack rdirichlet
 factorized_step <- function(J, K, D = NULL, ...) {
   if (is.null(D)) {
     D <- J
   }
   
-  Theta <- matnorm(J, K, ...)
-  B <- matnorm(K, D, ...)
+  Theta <- matunif(J, K, ...)
+  B <- matunif(K, D, ...)
   list(B = B, Theta = Theta)
 }
 

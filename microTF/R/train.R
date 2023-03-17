@@ -30,7 +30,7 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
     train_data <- patchify_df(ts_inter)
     fit <- list()
     for (j in seq_along(train_data$y)) {
-      fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds=100, verbose=0, nthread=4)
+      fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds=50, verbose=0, nthread=4)
     }
     result <- new("transfer_model", parameters = fit, method = method)
 

@@ -21,22 +21,20 @@ This generates the coefficient matrices for dynamics, perturbations, and
 interactions.
 
 ```{r}
-n_subject <- 20
+n_subject <- 50
 n_time <- 30
 n_lag <- 5
-#n_taxa <- 500
-n_taxa <- 50
+n_taxa <- 100
+#n_taxa <- 100
 n_perturb <- 1
-n_latent <- 5
+n_latent <- 2
 n_covariates <- 3
-#prop_nonnull <- 0.1
-prop_nonnull <- 0.2
+prop_nonnull <- 0.1
 
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
  sparsify() |>
  normalize(0.8)
-#B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 0.5)
-B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, sigma = 1)
+B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, lower = -1.5, upper = 1.5)
 
 nonnull_taxa <- sample(n_taxa, prop_nonnull * n_taxa)
 for (i in seq_along(B)) {
@@ -64,15 +62,15 @@ theta0 <- matrix(2, n_taxa, n_lag + 1)
 w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
 for (i in seq_along(w)) {
   for (j in seq_len(n_perturb)) {
-    start_ix <- sample(n_time - 2 * n_lag, 1)
-    end_ix <- start_ix + sample(2 * n_lag)
-    w[[i]][j, start_ix:end_ix] <- 1
+    start_ix <- sample((n_time / 3) : (n_time - n_lag), 1)
+    end_ix <- start_ix + sample((n_lag / 2) : (2 * n_lag), 1)
+    w[[i]][j, start_ix:min(n_time, end_ix)] <- 1
   }
 }
 
 z <- matnorm(n_subject, n_covariates)
 sizes <- runif(n_taxa, .1, 10)
-baselines <- rgamma(n_taxa, 1, .1)
+baselines <- rgamma(n_taxa, 40, 4)
 
 x <- list()
 for (i in seq_len(n_subject)) {
@@ -89,7 +87,7 @@ x_df <- map_dfr(x, ~ as_tibble(.) |> rownames_to_column("taxon"), .id = "subject
   mutate(
     time = as.integer(str_remove(time, "V")),
     taxon = str_c("tax", taxon)
-  )  |>
+  ) |>
   filter(time  > n_lag)
 
 B_df <- map_dfr(
@@ -102,16 +100,16 @@ x_df <- x_df |>
   left_join(B_df) %>%
   mutate(effect = rowSums(.[, -c(1:4)]))
   
-start_ix <- min(which(w[[1]][1, ] == 1))
-end_ix <- max(which(w[[1]][1, ] == 1))
+start_ix <- min(which(w[[2]][1, ] == 1))
+end_ix <- max(which(w[[2]][1, ] == 1))
 
 x_df |>
-  filter(effect != 0, subject == "1") |>
+  filter(effect != 0, subject == 2) |>
   ggplot(aes(time, value)) +
   geom_rect(xmin = start_ix, xmax = end_ix, ymin = 0, ymax = max(x_df$value), fill = "#d3d3d3") +
   geom_line(aes(col = effect, group = subject)) +
-  facet_wrap(~ reorder(taxon, effect), ncol = 10) +
-  scale_y_log10() +
+  facet_wrap(~ reorder(taxon, effect), scale = "free_y") +
+  scale_y_sqrt() +
   scale_color_gradient2(mid = "#d3d3d3")
 ```
 
@@ -129,7 +127,7 @@ w_df_ <- w_df |>
   filter(w != 0, time > n_lag)
 
 x_df |>
-  filter(taxon == "tax331") |>
+  filter(taxon == str_c("tax", tail(nonnull_taxa, 1))) |>
   ggplot(aes(time, reorder(subject, value))) +
   geom_tile(aes(fill = log(1 + value))) +
   geom_point(data = w_df_, shape = 1) +
@@ -212,101 +210,8 @@ interventions <- w_df |>
   pull(w, sample) |>
   as.matrix()
 
+reads <- log(1 + reads)
 ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
-```
-
-split the data and fit a GBM
-
-```{r}
-fit <- train(ts[seq_len(n_subject / 2)], method = "gbm")
-```
-
-Let's create some example counterfactual series from which to generate mirror
-statistics. We will want to ensure that the mirrors are in fact symmetric in the
-null cases.
-
-```{r}
-n_time <- 25
-n_taxa <- 500
-n_nonnull <- 5
-splits <- list(
-  list(y0 = matrix(rnorm(n_time * n_taxa), n_taxa, n_time)),
-  list(y0 = matrix(rnorm(n_time * n_taxa), n_taxa, n_time))
-)
-
-y11 <- splits[[1]]$y0 + rnorm(length(splits[[1]]$y0), 0, 1)
-signal <- 10
-y11[seq_len(n_nonnull), 1:5] <- y11[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, .5)
-
-y21 <- splits[[2]]$y0 + rnorm(length(splits[[2]]$y0), 0, 1)
-y21[seq_len(n_nonnull), 1:5] <- y11[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, 0.5)
-
-splits[[1]]$y1 <- y11
-splits[[2]]$y1 <- y21
-
-for (j in seq_len(5)) {
-  plot(splits[[2]]$y1[j, ])
-  points(splits[[2]]$y0[j, ], col = "red")
-}
-```
-
-
-```{r}
-n_subject <- 50
-n_time <- 10
-n_taxa <- 500
-n_nonnull <- 5
-signal <- 1 
-
-# organization is like this
-# splits
-#  split1
-#    subject1
-#      y0
-#      y1
-#    subject2
-#      y0
-#      y1
-#    subject3
-#      y0
-#      y1
-#  split2
-#    y0
-#    y1
-splits <- list(
-  replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F),
-  replicate(n_subject, list(y0 = matnorm(n_taxa, n_time)), simplify = F)
-)
-
-for (s in seq_along(splits)) {
-  for (i in seq_along(splits[[s]])) {
-    splits[[s]][[i]]$y1 <- splits[[s]][[i]]$y0 + rnorm(length(splits[[s]][[i]]$y0), 0, 1)
-    splits[[s]][[i]]$y1[seq_len(n_nonnull), 1:5] <- splits[[s]][[i]]$y1[seq_len(n_nonnull), 1:5] + rnorm(n_nonnull * 5, signal, 1)
-  }
-  
-}
-
-plot(splits[[1]][[1]]$y1[1, ], col = "red")
-points(splits[[1]][[1]]$y0[1, ])
-```
-
-```{r}
-tau_summaries <- function(split) {
-  int <- do.call(cbind, map(split, ~ rowSums(.$y1 - .$y0)))
-  int_abs <- do.call(cbind, map(split, ~ rowSums(abs(.$y1 - .$y0))))
-  list(int = int, int_abs = int_abs)
-}
-
-temporal_mirror <- function(splits) {
-  tau <- map(splits, tau_summaries)
-  sgn <- rowMeans(sign(tau[[1]]$int * tau[[2]]$int))
-  magnitude <- rowMeans(tau[[1]]$int_abs + tau[[2]]$int_abs)
-  sgn * magnitude
-}
-
-m <- temporal_mirror(splits)
-print(m[1:(2 * n_nonnull)])
-hist(m, 100)
 ```
 
 Now, how can we get the y1 and y0 for each person across the two splits? Note
@@ -315,80 +220,96 @@ we've been taught) -- it's going to be enough to ensure sign consistency across
 splits.
 
 ```{r}
-ts <- ts_from_dfs(t(reads), interventions, metadata, subject_data)
+splits <- split_estimates(ts, 5)
+```
 
-synthetic_control <- function(ts, n_lag = 4, ...) {
-  fit <- train(ts, ...)
-  controls <- ts
-  print("training")
+```{r}
+m <- temporal_mirror(splits[[1]])
   
-  for (i in seq_along(ts)) {
-    w <- interventions(ts[[i]])
-    w_ <- matrix(0, nrow(w), ncol(w))
-    colnames(w_) <- colnames(w)
-    rownames(w_) <- rownames(w)
-    interventions(controls[[i]]) <- w_
-    
-    first_inter <- max(n_lag, min(which(colSums(w) != 0)))
-    v <- values(controls[[i]])
-    values(controls[[i]]) <- v[, seq_len(first_inter)]
-  }
-  
-  print("prediction")
-  predict(fit, controls)
-}
-
-split_ix <- sample(length(ts), 0.5 * length(ts))
-split_inter <- list(
-  list(
-    ts = ts[split_ix],
-    control = synthetic_control(ts[split_ix], method = "gbm")
-  ),
-  list(
-    ts = ts[-split_ix],
-    control = synthetic_control(ts[-split_ix], method = "gbm")
-  )
-)
-
-splits <- list()
-for (s in seq_along(split_inter)) {
-  split_s <- list()
-  for (i in seq_along(split_inter[[s]]$ts)) {
-    split_s[[i]] <- list(
-      y1 = values(split_inter[[s]]$ts[[i]]),
-      y0 = values(split_inter[[s]]$control[[i]])
-    )
-  }
-  splits[[s]] <-  split_s
-}
-```
-
-```{r}
-# a few of the taxa with actual differences
-for (i in nonnull_taxa) {
-  plot(splits[[1]][[1]]$y0[i, ])
-  points(splits[[1]][[1]]$y1[i, ], col = "red")
-}
-```
-
-
-```{r}
-# and a few with no åctual difference
-for (i in seq(setdiff(1:5, nonnull_taxa))) {
-  plot(splits[[1]][[1]]$y0[i, ])
-  points(splits[[1]][[1]]$y1[i, ], col = "red")
-}
-```
-
-```{r}
-m <- temporal_mirror(splits) %>%
-  as_tibble() %>%
-  mutate(truth = row_number() %in% nonnull_taxa) %>%
-  dplyr::rename(m = value) %>%
-  arrange(m) %>%
+m_df <- m |>
+  as_tibble() |>
+  mutate(truth = row_number() %in% nonnull_taxa) |>
+  dplyr::rename(m = value) |>
+  arrange(m) |>
   mutate(ix = row_number())
 
-ggplot(m) +
-  geom_point(aes(ix, m, col = truth))
+ggplot(m_df) +
+  geom_histogram(aes(m, fill = truth), position = "identity", alpha = 0.5, bins = 40) + 
+  facet_grid(. ~ truth, scale = "free")
+```
+
+```{r}
+ms <- multiple_split_mirror(splits)
+S_hat <- which(multiple_data_splitting(ms, 1))
+S <- nonnull_taxa
+
+length(setdiff(S_hat, S)) / length(S_hat)
+length(intersect(S_hat, S)) / length(S)
+```
+
+```{r}
+ms_df <- bind_rows(ms, .id = "split") %>%
+  pivot_longer(-split, names_to = "taxon") %>%
+  mutate(truth = taxon %in% nonnull_taxa_)
+
+ggplot(ms_df) +
+  geom_histogram(aes(value, fill = truth)) +
+  facet_wrap(~ truth, scales = "free_y")
+```
+
+
+```{r, fig.height = 10, fig.width = 4}
+ggplot(ms_df) +
+  geom_point(aes(value, reorder(taxon, value))) +
+  facet_grid(truth ~ ., space = "free_y", scales = "free_y")
+```
+
+```{r}
+counter_df <- list()
+i <- 1
+for (k in seq_along(splits)) {
+  for (s in seq_along(splits[[k]])) {
+    for (subject in seq_along(splits[[k]][[s]])) {
+      for (counter in c("y1", "y0")) {
+        cur <- as_tibble(splits[[k]][[s]][[subject]][[counter]]) %>%
+          mutate(taxon = str_c("tax", row_number())) %>%
+          pivot_longer(-taxon, names_to = "sample") %>%
+          group_by(taxon) %>%
+          mutate(
+            time = row_number(),
+            subject = subject,
+            counter = counter,
+            split = s,
+            multisplit = k
+          )
+        counter_df[[i]] <- cur
+        i <- i + 1
+      }
+    }
+  }
+}
+
+counter_df <- bind_rows(counter_df) %>%
+  pivot_wider(names_from = "counter", values_from = "value") %>%
+  group_by(taxon, subject, split, multisplit) %>%
+  mutate(int_diff = mean(y1 - y0))
+```
+
+
+```{r}
+counter_df %>%
+  filter(taxon %in% c("tax1", "tax24", "tax57", "tax95", "tax2"), multisplit < 5) %>%
+  ggplot() +
+  geom_ribbon(aes(time, ymin = y0, ymax = y1, fill = int_diff, group = interaction(subject, counter, split)), alpha = 0.8) +
+  facet_grid(multisplit  + split ~ taxon) +
+  scale_fill_gradient2(mid = "#d3d3d3")
+```
+
+
+```{r}
+map_dfr(ms, fdp_hat, .id = "split") |>
+  ggplot() +
+  geom_step(aes(t, fdp, group = split)) +
+  xlim(0, 2)
 ```
 
