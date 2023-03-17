@@ -1,5 +1,6 @@
 
-#' @importFrom gbm gbm
+#' @importFrom xgboost xgboost
+#' @importFrom glmnet glmnet
 #' @export
 train <- function(ts_inter, method = "zeros", hyper = list()) {
   if (method == "zeros") {
@@ -29,7 +30,15 @@ train <- function(ts_inter, method = "zeros", hyper = list()) {
     train_data <- patchify_df(ts_inter)
     fit <- list()
     for (j in seq_along(train_data$y)) {
-      fit[[j]] <- gbm(y ~ ., data = cbind(y = train_data$y[[j]], train_data$x), "gaussian")
+      fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds=100, verbose=0, nthread=4)
+    }
+    result <- new("transfer_model", parameters = fit, method = method)
+
+  } else if (method == "lasso") {
+    train_data <- patchify_df(ts_inter)
+    fit <- list()
+    for (j in seq_along(train_data$y)) {
+      fit[[j]] <- glmnet(as.matrix(train_data$x), train_data$y[[j]])
     }
     result <- new("transfer_model", parameters = fit, method = method)
 
