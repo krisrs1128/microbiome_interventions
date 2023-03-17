@@ -47,8 +47,8 @@ transfer_predict <- function(object, newdata) {
     result <- zeros_predict(newdata)
   } else if (object@method == "gaussian_latent") {
     result <- gaussian_latent_predict(object, newdata)
-  } else if (object@method == "gbm") {
-    result <- gbm_predict(object, newdata)
+  } else if (object@method %in% c("gbm", "lasso")) {
+    result <- model_predict(object, newdata)
   } else if (object@method == "mdsine") {
     result <- forward_simulate(object, newdata)
   }
