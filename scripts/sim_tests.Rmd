@@ -29,11 +29,11 @@ n_taxa <- 100
 n_perturb <- 1
 n_latent <- 2
 n_covariates <- 3
-prop_nonnull <- 0.1
+prop_nonnull <- 0.2
 
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
- sparsify() |>
- normalize(0.8)
+ sparsify(1) #|>
+ #normalize(0.8)
 B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, lower = -1.5, upper = 1.5)
 
 nonnull_taxa <- sample(n_taxa, prop_nonnull * n_taxa)
@@ -219,8 +219,92 @@ that we don't have to apply the model to the test split (unlike everything else
 we've been taught) -- it's going to be enough to ensure sign consistency across
 splits.
 
+
 ```{r}
-splits <- split_estimates(ts, 5)
+pdp_generator <- function(ts, lags, qs = c(0.25, 0.5, 0.75), ...) {
+  x <- patchify_df(ts, lags[1], lags[2])$x
+  
+  function(partial_x, fit) {
+    pnames <- intersect(colnames(partial_x), colnames(x))
+    
+    y_hat <- list()
+    nx <- nrow(partial_x)
+    for (j in seq_along(fit)) {
+      y_hat[[j]] <- matrix(nrow = nx, ncol = length(qs) + 2)
+      colnames(y_hat[[j]]) <- c("index", str_c("q", qs), "mean")
+      x_ <- x
+ 
+      for (i in seq_len(nx)) {
+        x_[, pnames] <- unlist(partial_x[i, ])
+        y_hat_ji <- predict(fit[[j]], x_)
+        y_hat[[j]][i, ] <- c(
+          i,
+          quantile(y_hat_ji, qs),
+          mean(y_hat_ji)
+        )
+      }
+    }
+    
+    y_hat
+  }
+}
+
+new_x <- tibble(
+  intervention1_lag0 = c(1, 0), 
+  intervention1_lag1 = c(1, 0),
+  intervention1_lag2 = c(1, 0),
+  intervention1_lag3 = c(1, 0),
+  intervention1_lag4 = c(1, 0)
+)
+
+pdps <- list()
+pdp_fun <- pdp_generator(ts, c(n_lag, n_lag))
+
+k <- 1
+for (s in seq_len(100)) {
+  split_ix <- sample(seq_along(ts), 0.5 * length(ts))
+  hyper <- list(P = n_lag, Q = n_lag)
+  fits <- list(
+    train(ts[split_ix], method = "gbm", hyper = hyper),
+    train(ts[-split_ix], method = "gbm", hyper = hyper)
+  )
+  
+  for (split in seq_len(2)) {
+    pdps[[k]] <- pdp_fun(new_x, fits[[split]]@parameters) %>%
+      map_dfr(as_tibble, .id = "taxon") %>%
+      mutate(
+        taxon = str_c("tax", taxon),
+        split = split,
+        multisplit = s
+      )
+    k <- k + 1
+  }
+}
+
+pdps0 <- pdps
+```
+
+
+```{r}
+pdps0 <- bind_rows(pdps0) %>%
+  select(multisplit, split, taxon, index, mean) %>%
+  pivot_wider(names_from = index, values_from = mean) %>%
+  mutate(difference = `1` - `2`) %>%
+  select(multisplit, split, taxon, difference) %>%
+  pivot_wider(names_from = split, values_from = difference)
+
+ggplot(pdps0) +
+  geom_histogram(aes(`1` - `2`), bins = 10) +
+  geom_vline(xintercept = 0, col = "orange") +
+  facet_wrap(~ taxon, scales = "free")
+```
+
+
+
+
+
+```{r}
+splits <- split_estimates(ts, 2)
 ```
 
 ```{r}
@@ -289,27 +373,44 @@ for (k in seq_along(splits)) {
   }
 }
 
-counter_df <- bind_rows(counter_df) %>%
+counter_df <- bind_rows(counter_df)
+
+counter_df2 <- counter_df %>%
   pivot_wider(names_from = "counter", values_from = "value") %>%
   group_by(taxon, subject, split, multisplit) %>%
   mutate(int_diff = mean(y1 - y0))
 ```
 
-
 ```{r}
 counter_df %>%
-  filter(taxon %in% c("tax1", "tax24", "tax57", "tax95", "tax2"), multisplit < 5) %>%
+  filter(taxon %in% c("tax1", "tax3", "tax74", "tax95"), multisplit < 5, subject < 4) %>%
+  ggplot() +
+  geom_line(aes(time, value, col = counter, group = interaction(subject, counter))) +
+  facet_grid(multisplit + split ~ taxon)
+```
+
+
+```{r}
+counter_df2 %>%
+  filter(taxon %in% c("tax1", "tax3", "tax74", "tax95"), multisplit < 5) %>%
   ggplot() +
   geom_ribbon(aes(time, ymin = y0, ymax = y1, fill = int_diff, group = interaction(subject, counter, split)), alpha = 0.8) +
   facet_grid(multisplit  + split ~ taxon) +
   scale_fill_gradient2(mid = "#d3d3d3")
 ```
 
+```{r}
+counter_df2 %>%
+  filter(y1 != y0, taxon %in% c("tax1", "tax2", "tax3")) %>%
+  ggplot() +
+  geom_histogram(aes(y1 - y0)) +
+  geom_vline(xintercept = 0, col = "red") +
+  facet_grid(multisplit + split ~ taxon)
+```
 
 ```{r}
 map_dfr(ms, fdp_hat, .id = "split") |>
   ggplot() +
-  geom_step(aes(t, fdp, group = split)) +
-  xlim(0, 2)
+  geom_step(aes(t, fdp, group = split))
 ```
 

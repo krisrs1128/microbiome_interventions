@@ -101,7 +101,7 @@ time_lags <- function(fit) {
   }
   
   P <- lag_from_names(inputs, "taxon")
-  Q <- lag_from_names(inputs, "intervention") + 1
+  Q <- lag_from_names(inputs, "intervention")
   c(P, Q)
 }
 

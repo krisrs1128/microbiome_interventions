@@ -81,6 +81,7 @@ split_estimates <- function(ts, n_splits = 1, perturb_len = 5, method = "gbm") {
   splits
 }
 
+#' @export
 multiple_split_mirror <- function(multisplits) {
   ms <- list()
   for (s in seq_along(multisplits)) {
