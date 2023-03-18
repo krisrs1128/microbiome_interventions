@@ -21,19 +21,18 @@ This generates the coefficient matrices for dynamics, perturbations, and
 interactions.
 
 ```{r}
-n_subject <- 50
+n_subject <- 40
 n_time <- 30
-n_lag <- 3
+n_lag <- 5
 n_taxa <- 100
-#n_taxa <- 100
 n_perturb <- 1
 n_latent <- 2
 n_covariates <- 3
 prop_nonnull <- 0.1
 
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
- sparsify(1) #|>
- #normalize(0.8)
+ sparsify() |>
+ normalize(0.8)
 B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, lower = -1.5, upper = 1.5)
 
 nonnull_taxa <- sample(n_taxa, prop_nonnull * n_taxa)
@@ -219,9 +218,8 @@ that we don't have to apply the model to the test split (unlike everything else
 we've been taught) -- it's going to be enough to ensure sign consistency across
 splits.
 
-
 ```{r}
-pdp_generator <- function(ts, lags) {
+pd_generator <- function(ts, lags) {
   x <- patchify_df(ts, lags[1], lags[2])$x
   
   function(fit, partial_x) {
@@ -244,224 +242,94 @@ pdp_generator <- function(ts, lags) {
 ```
 
 ```{r}
-pdp_effects <- function(ts, w0, w1, lags = NULL, ...) {
-  N <- length(ts)
-  
-  split_ix <- sample(N, 0.5 * N)
-  fits <- list(
-    train(ts[split_ix], ...)@parameters,
-    train(ts[-split_ix], ...)@parameters
-  )
-  
-  if (is.null(lags)) {
-    lags <- time_lags(fits[[1]][[1]])
-  }
-  
-  effects <- matrix(nrow = length(fits[[1]]), ncol = 2)
-  pdp_fun <- pdp_generator(ts, lags)
-  for (s in seq_along(fits)) {
-    effects[, s] <- pdp_fun(fits[[s]], w1) - pdp_fun(fits[[s]], w0)
+w0 <- matrix(0, n_lag, n_lag)
+colnames(w0) <- str_c("intervention1_lag", seq(0, n_lag -1 ))
+w1 <- w0
+for (i in seq_len(n_lag)) {
+  w1[i, ] <- c(rep(1, i), rep(0, n_lag - i))
+}
+```
+
+
+```{r}
+pd_effects <- function(pd, fit, w0, w1) {
+  pd(fit, w1) - pd(fit, w0)
+}
+
+pd_splits <- function(ts, w0, w1, n_splits, method = "gbm", ...) {
+  effects <- replicate(n_splits, array(dim = c(nrow(ts[[1]]), 2, nrow(w0))), simplify = FALSE)
+
+  for (s in seq_len(n_splits)) {
+    print(str_c("Evaluating split ", s))
+    split_ix <- sample(length(ts), 0.5 * length(ts))
+    fits <- list(
+      train(ts[split_ix], method = "gbm", ...)@parameters,
+      train(ts[-split_ix], method = "gbm", ...)@parameters
+    )
+
+    lags <- microTF:::time_lags(fits[[1]][[1]])
+    pd_fun <- list(
+      pd_generator(ts[split_ix], lags),
+      pd_generator(ts[-split_ix], lags)
+    )
+    
+    for (i in seq_along(fits)) {
+      effects[[s]][,i,] <- pd_effects(pd_fun[[i]], fits[[i]], w0, w1)
+    }
   }
   
   effects
 }
+```
 
-pdp_mirror <- function(ts, w0, w1, lags = NULL, ...) {
-  effects <- pdp_effects(ts, w0, w1, lags, ...)
+```{r}
+consistency_mirror <- function(effects) {
   sgn <- sign(effects[, 1] * effects[, 2])
-  magnitude <- rowMeans(sgn)
+  magnitude <- rowMeans(abs(effects))
   sgn * magnitude
 }
 
-
-w0 <- matrix(0, 1, n_lag)
-colnames(w0) <- str_c("intervention1_lag", seq(0, n_lag -1 ))
-w1 <- w0
-w1[1, 1] <- 1
-
-m <- pdp_mirror(ts, w0, w1, method = "gbm")
-
-
-
-
-
-```
-```{r}
-effects[nonnull_taxa, ]
-effects[-nonnull_taxa, ]
+effects <- pd_splits(ts, w0, w1, 10, method = "gbm")
 ```
 
 
-
 ```{r}
-new_x <- tibble(
-  intervention1_lag0 = c(1, 0), 
-  intervention1_lag1 = c(0, 0),
-  intervention1_lag2 = c(0, 0),
-  intervention1_lag3 = c(0, 0),
-  intervention1_lag4 = c(0, 0)
-)
-
-pdps <- list()
-pdp_fun <- pdp_generator(ts, c(n_lag, n_lag))
-
+ms <- list()
 k <- 1
-for (s in seq_len(100)) {
-  print(s)
-  split_ix <- sample(seq_along(ts), 0.5 * length(ts))
-  hyper <- list(P = n_lag, Q = n_lag)
-  fits <- list(
-    train(ts[split_ix], method = "gbm", hyper = hyper),
-    train(ts[-split_ix], method = "gbm", hyper = hyper)
-  )
-  
-  for (split in seq_len(2)) {
-    pdps[[k]] <- pdp_fun(new_x, fits[[split]]@parameters) %>%
-      map_dfr(as_tibble, .id = "taxon") %>%
-      mutate(
-        taxon = str_c("tax", taxon),
-        split = split,
-        multisplit = s
-      )
+for (s in seq_along(effects)) {
+  for (lag in seq_len(dim(effects[[s]])[3])) {
+    ms[[k]] <- tibble(
+      m = consistency_mirror(effects[[s]][,, lag]),
+      lag = lag,
+      multisplit = s
+    ) |>
+      mutate(taxon = row_number())
     k <- k + 1
   }
 }
 
-pdps0 <- pdps
-```
+ms <- bind_rows(ms) |>
+  mutate(
+    truth = taxon %in% nonnull_taxa,
+    m_ = m + rnorm(n(), 0, 0.1)
+  )
 
-
-```{r}
-bind_rows(pdps0) %>%
-  select(multisplit, split, taxon, index, mean) %>%
-  pivot_wider(names_from = index, values_from = mean) %>%
-  mutate(difference = `1` - `2`) %>%
-  ggplot() +
-  geom_vline(xintercept = 0) +
-  geom_point(aes(difference, reorder(taxon, difference), col = as.factor(split)), position = position_jitter(h = 0.1))
+ggplot(ms) +
+  geom_histogram(aes(m_, fill = truth)) +
+  facet_wrap(~ lag)
 ```
 
 ```{r}
-bind_rows(pdps0) %>%
-  select(multisplit, split, taxon, index, mean) %>%
-  pivot_wider(names_from = index, values_from = mean) %>%
-  mutate(difference = `1` - `2`) %>%
-  select(multisplit, split, taxon, difference) %>%
-  pivot_wider(names_from = split, values_from = difference) %>%
-  mutate(sign = sign(`1` * `2`), magnitude = 0.5 * (`1` + `2`)) %>%
-  group_by(taxon) %>%
-  summarise(m_sign = mean(sign), m_magnitude = mean(magnitude)) %>%
-  arrange(-m_sign, -m_magnitude)
+ms_ <- ms |>
+  select(multisplit, m_, lag) %>% 
+  split(.$lag) %>%
+  map(~ split(., .$multisplit) %>% map(~ pull(., m_)))
+
+lag <- 1
+R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
+S <- intersect(nonnull_taxa_,  R)
+V <- setdiff(R, nonnull_taxa_)
+
+length(V) / length(R)
+length(S) / length(nonnull_taxa_)
 ```
-
-```{r}
-splits <- split_estimates(ts, 2)
-```
-
-```{r}
-m <- temporal_mirror(splits[[1]])
-  
-m_df <- m |>
-  as_tibble() |>
-  mutate(truth = row_number() %in% nonnull_taxa) |>
-  dplyr::rename(m = value) |>
-  arrange(m) |>
-  mutate(ix = row_number())
-
-ggplot(m_df) +
-  geom_histogram(aes(m, fill = truth), position = "identity", alpha = 0.5, bins = 40) + 
-  facet_grid(. ~ truth, scale = "free")
-```
-
-```{r}
-ms <- multiple_split_mirror(splits)
-S_hat <- which(multiple_data_splitting(ms, 1))
-S <- nonnull_taxa
-
-length(setdiff(S_hat, S)) / length(S_hat)
-length(intersect(S_hat, S)) / length(S)
-```
-
-```{r}
-ms_df <- bind_rows(ms, .id = "split") %>%
-  pivot_longer(-split, names_to = "taxon") %>%
-  mutate(truth = taxon %in% nonnull_taxa_)
-
-ggplot(ms_df) +
-  geom_histogram(aes(value, fill = truth)) +
-  facet_wrap(~ truth, scales = "free_y")
-```
-
-
-```{r, fig.height = 10, fig.width = 4}
-ggplot(ms_df) +
-  geom_point(aes(value, reorder(taxon, value))) +
-  facet_grid(truth ~ ., space = "free_y", scales = "free_y")
-```
-
-```{r}
-counter_df <- list()
-i <- 1
-for (k in seq_along(splits)) {
-  for (s in seq_along(splits[[k]])) {
-    for (subject in seq_along(splits[[k]][[s]])) {
-      for (counter in c("y1", "y0")) {
-        cur <- as_tibble(splits[[k]][[s]][[subject]][[counter]]) %>%
-          mutate(taxon = str_c("tax", row_number())) %>%
-          pivot_longer(-taxon, names_to = "sample") %>%
-          group_by(taxon) %>%
-          mutate(
-            time = row_number(),
-            subject = subject,
-            counter = counter,
-            split = s,
-            multisplit = k
-          )
-        counter_df[[i]] <- cur
-        i <- i + 1
-      }
-    }
-  }
-}
-
-counter_df <- bind_rows(counter_df)
-
-counter_df2 <- counter_df %>%
-  pivot_wider(names_from = "counter", values_from = "value") %>%
-  group_by(taxon, subject, split, multisplit) %>%
-  mutate(int_diff = mean(y1 - y0))
-```
-
-```{r}
-counter_df %>%
-  filter(taxon %in% c("tax1", "tax3", "tax74", "tax95"), multisplit < 5, subject < 4) %>%
-  ggplot() +
-  geom_line(aes(time, value, col = counter, group = interaction(subject, counter))) +
-  facet_grid(multisplit + split ~ taxon)
-```
-
-
-```{r}
-counter_df2 %>%
-  filter(taxon %in% c("tax1", "tax3", "tax74", "tax95"), multisplit < 5) %>%
-  ggplot() +
-  geom_ribbon(aes(time, ymin = y0, ymax = y1, fill = int_diff, group = interaction(subject, counter, split)), alpha = 0.8) +
-  facet_grid(multisplit  + split ~ taxon) +
-  scale_fill_gradient2(mid = "#d3d3d3")
-```
-
-```{r}
-counter_df2 %>%
-  filter(y1 != y0, taxon %in% c("tax1", "tax2", "tax3")) %>%
-  ggplot() +
-  geom_histogram(aes(y1 - y0)) +
-  geom_vline(xintercept = 0, col = "red") +
-  facet_grid(multisplit + split ~ taxon)
-```
-
-```{r}
-map_dfr(ms, fdp_hat, .id = "split") |>
-  ggplot() +
-  geom_step(aes(t, fdp, group = split))
-```
-
