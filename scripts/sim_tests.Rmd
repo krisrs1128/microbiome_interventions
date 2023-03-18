@@ -21,15 +21,15 @@ This generates the coefficient matrices for dynamics, perturbations, and
 interactions.
 
 ```{r}
-n_subject <- 100
+n_subject <- 50
 n_time <- 30
 n_lag <- 3
-n_taxa <- 10
+n_taxa <- 100
 #n_taxa <- 100
 n_perturb <- 1
 n_latent <- 2
 n_covariates <- 3
-prop_nonnull <- 0.2
+prop_nonnull <- 0.1
 
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
  sparsify(1) #|>
@@ -221,34 +221,79 @@ splits.
 
 
 ```{r}
-pdp_generator <- function(ts, lags, qs = c(0.25, 0.5, 0.75), ...) {
+pdp_generator <- function(ts, lags) {
   x <- patchify_df(ts, lags[1], lags[2])$x
   
-  function(partial_x, fit) {
+  function(fit, partial_x) {
     pnames <- intersect(colnames(partial_x), colnames(x))
-    
-    y_hat <- list()
     nx <- nrow(partial_x)
+    y_hat <- matrix(nrow = length(fit), ncol = nx)
+
     for (j in seq_along(fit)) {
-      y_hat[[j]] <- matrix(nrow = nx, ncol = length(qs) + 2)
-      colnames(y_hat[[j]]) <- c("index", str_c("q", qs), "mean")
       x_ <- x
  
       for (i in seq_len(nx)) {
-        x_[, pnames] <- unlist(partial_x[i, ])
-        y_hat_ji <- predict(fit[[j]], x_)
-        y_hat[[j]][i, ] <- c(
-          i,
-          quantile(y_hat_ji, qs),
-          mean(y_hat_ji)
-        )
+        x_[, pnames] <- partial_x[i, ]
+        y_hat[j, i] <- mean(predict(fit[[j]], x_))
       }
     }
     
     y_hat
   }
 }
+```
 
+```{r}
+pdp_effects <- function(ts, w0, w1, lags = NULL, ...) {
+  N <- length(ts)
+  
+  split_ix <- sample(N, 0.5 * N)
+  fits <- list(
+    train(ts[split_ix], ...)@parameters,
+    train(ts[-split_ix], ...)@parameters
+  )
+  
+  if (is.null(lags)) {
+    lags <- time_lags(fits[[1]][[1]])
+  }
+  
+  effects <- matrix(nrow = length(fits[[1]]), ncol = 2)
+  pdp_fun <- pdp_generator(ts, lags)
+  for (s in seq_along(fits)) {
+    effects[, s] <- pdp_fun(fits[[s]], w1) - pdp_fun(fits[[s]], w0)
+  }
+  
+  effects
+}
+
+pdp_mirror <- function(ts, w0, w1, lags = NULL, ...) {
+  effects <- pdp_effects(ts, w0, w1, lags, ...)
+  sgn <- sign(effects[, 1] * effects[, 2])
+  magnitude <- rowMeans(sgn)
+  sgn * magnitude
+}
+
+
+w0 <- matrix(0, 1, n_lag)
+colnames(w0) <- str_c("intervention1_lag", seq(0, n_lag -1 ))
+w1 <- w0
+w1[1, 1] <- 1
+
+m <- pdp_mirror(ts, w0, w1, method = "gbm")
+
+
+
+
+
+```
+```{r}
+effects[nonnull_taxa, ]
+effects[-nonnull_taxa, ]
+```
+
+
+
+```{r}
 new_x <- tibble(
   intervention1_lag0 = c(1, 0), 
   intervention1_lag1 = c(0, 0),
