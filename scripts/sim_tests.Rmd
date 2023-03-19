@@ -325,7 +325,7 @@ ms_ <- ms |>
   split(.$lag) %>%
   map(~ split(., .$multisplit) %>% map(~ pull(., m_)))
 
-lag <- 1
+lag <- 3
 R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
 S <- intersect(nonnull_taxa_,  R)
 V <- setdiff(R, nonnull_taxa_)
