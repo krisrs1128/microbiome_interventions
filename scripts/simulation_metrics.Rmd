@@ -1,0 +1,67 @@
+---
+title: "Gather Simulation Metrics"
+output: html_document:
+  highlight: "kate"
+date: "`r Sys.Date()`"
+params:
+  data: "sim_input_1.rda"
+  hyper: NULL
+  method: "mbtransfer"
+  mirror_counterfactuals: NULL
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+This script doesn't presume to know which input datasets are to be considered.
+It just runs on whatever data are available and computes metrics if possible.
+The main parameters are related to cross validation, the method to use, the data
+to use, and any ground truth needed in order to compute metrics.
+
+```{r}
+load(params$data)
+ts <- ts_from_dfs(reads, interventions, samples, subject_data) |>
+  interpolate()
+```
+
+First, the forecasting metrics.
+
+```{r}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    train(x, method, hyper)
+  }
+}
+
+hyper <- get(load(params$hyper))
+result <- cross_validate(ts, tr_fun(params$method, hyper))
+# save the cross-validation metrics
+```
+
+Next, the hypothesis testing metrics.
+
+```{r}
+load(params$mirror_counterfactuals)
+effects <- pd_splits(ts, w0, w1, 20, method = params$method)
+ms <- consistency_mirror_multiple(effects)
+```
+
+
+```{r}
+#ms <- ms |>
+#  mutate(truth = taxon %in% nonnull_taxa)
+# ms_ <- ms |>
+#   select(multisplit, m_, lag) %>% 
+#   split(.$lag) %>%
+#   map(~ split(., .$multisplit) %>% map(~ pull(., m_)))
+# 
+# lag <- 3
+# if nonnull_taxa not present, then skip tteh evaluation
+# R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
+# S <- intersect(nonnull_taxa_,  R)
+# V <- setdiff(R, nonnull_taxa_)
+
+# save the false discovery rate metrics. We'll have a separate script for DESeq2
+# / metagenomeSeq etc.
+```
