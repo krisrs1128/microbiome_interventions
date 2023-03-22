@@ -53,6 +53,7 @@ patchify_single_df <- function(ts_inter, p, q) {
 }
 
 #' @importFrom purrr map_dfr
+#' @importFrom tibble as_tibble
 #' @importFrom dplyr select bind_cols
 #' @export
 patchify_df <- function(ts_inter, p = 2, q = 3) {

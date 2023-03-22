@@ -1,17 +1,11 @@
 
+#' @importFrom xgboost xgboost
 #' @export
-mbtransfer <- function(ts_inter, P = 1, Q = 1, ...) {
-  if (is.null(verbose)) {
-    verbose <- 0
-  }
-  if (is.null(nrounds)) {
-    nrounds <- 25
-  }
-  
+mbtransfer <- function(ts_inter, P = 1, Q = 1, verbose = 0, nrounds = 25, ...) {
   train_data <- patchify_df(ts_inter, P, Q)
   fit <- list()
   for (j in seq_along(train_data$y)) {
-    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], ...)
+    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, verbose = verbose, ...)
   }
   
   fit

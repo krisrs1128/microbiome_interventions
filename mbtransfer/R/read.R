@@ -1,5 +1,5 @@
 
-#' @importFrom dplyr pull filter
+#' @importFrom dplyr pull filter left_join distinct
 #' @export
 ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   subjects <- unique(metadata$subject)
