@@ -39,6 +39,18 @@ sparsify <- function(A, sparsity = 0.8) {
 }
 
 #' @export
+sparsify_rows <- function(B, nonnull_ix = NULL, sparsity_frac = 0.8) {
+  if (is.null(nonnull_ix)) {
+    nonnull_ix <- sample(nrow(B[[1]]), sparsity_frac * nrow(B[[1]]))
+  }
+  
+  for (i in seq_along(B)) {
+    B[[i]][-nonnull_ix, ] <- 0
+  }
+  B
+}
+
+#' @export
 linear_sum <- function(coefs) {
   n_lag <- length(coefs)
   n_taxa <- nrow(coefs[[1]])
@@ -64,7 +76,7 @@ low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
     coefs[[l]] <- factorized_step(n_taxa, n_latent, n_perturb, ...)
   }
   
-  coefs %>%
+  coefs |>
     map(~ .$Theta %*% .$B)
 }
 
@@ -83,6 +95,20 @@ low_rank_step_ <- function(n_taxa, n_latent, n_perturb, n_lag) {
     coefs[[j]] <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag)
   }
   coefs
+}
+
+#' @export
+random_interventions <- function(n_perturb, n_time, n_lag = 3) {
+  w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
+  for (i in seq_along(w)) {
+    for (j in seq_len(n_perturb)) {
+      start_ix <- sample((n_time / 3) : (n_time - n_lag), 1)
+      end_ix <- start_ix + sample((n_lag / 2) : (2 * n_lag), 1)
+      w[[i]][j, start_ix:min(n_time, end_ix)] <- 1
+    }
+  }
+  
+  w
 }
 
 #' @export
@@ -146,4 +172,14 @@ generate_sample <- function(theta0, w, z, step_generator, sampler) {
   }
   
   x
+}
+
+#' @export
+generate_samples <- function(step_generator, sampler, theta0, w, z) {
+  x <- list()
+  for (i in seq_len(nrow(z))) {
+    x[[i]] <- generate_sample(theta0, w[[i]], z[i, ], step_generator, sampler)
+    rownames(x[[i]]) <- str_c("tax", seq_len(nrow(x[[i]])))
+  }
+  x  
 }

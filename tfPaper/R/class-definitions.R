@@ -1,5 +1,5 @@
 
-#' @importFrom mbtrasnfer split_future
+#' @importFrom mbtransfer split_future
 model_predict <- function(object, newdata) {
   fit <- object@parameters
   series <- list()
