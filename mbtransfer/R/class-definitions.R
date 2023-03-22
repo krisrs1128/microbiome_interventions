@@ -17,14 +17,6 @@ setClass(
   )
 )
 
-setClass(
-  "transfer_model",
-  slots = c(
-    parameters = "ANY",
-    method = "character"
-  )
-)
-
 single_subset <- function(x, i, j, ..., drop = FALSE) {
   values <- x@values[i, j, drop = drop]
   time <- x@time[j]
@@ -41,30 +33,6 @@ multi_subset <- function(x, i, j, ..., drop = FALSE) {
   new("ts_inter", series = result)
 }
 
-model_predict <- function(object, newdata) {
-  fit <- object@parameters
-  series <- list()
-  new_interventions <- list()
-
-  for (i in seq_along(newdata)) {
-    split_data <- split_future(newdata[[i]])
-    series[[i]] <- split_data$pre
-    new_interventions[[i]] <- split_data$interventions
-  }
-
-  newdata <- new("ts_inter", series = series, subject_data = subject_data(newdata))
-  model_predict_(fit, newdata, new_interventions)
-}
-
-train <- function(ts_inter, P = 1, Q = 1, ...) {
-  train_data <- patchify_df(ts_inter, P, Q)
-  fit <- list()
-  for (j in seq_along(train_data$y)) {
-    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], ...)
-  }
-  new("transfer_model", parameters = fit, method = method)
-}
-
 setMethod("length", "ts_inter", function(x) length(x@series))
 setMethod("nrow", "ts_inter_single", function(x) nrow(x@values))
 setMethod("ncol", "ts_inter_single", function(x) ncol(x@values))
@@ -76,12 +44,6 @@ setMethod("[", c("ts_inter", "numeric", "missing", "ANY"), function(x, i, j, ...
 setMethod("[[", c("ts_inter", "numeric", "missing"), function(x, i, j, ...) x@series[[i]])
 setMethod("[", c("ts_inter", "logical", "missing", "ANY"), function(x, i, j, ..., drop=TRUE) initialize(x, series=x@series[i]))
 setMethod("[[", c("ts_inter", "logical", "missing"), function(x, i, j, ...) x@series[[i]])
-
-#' @export
-setMethod("predict",  c(object = "transfer_model"), model_predict)
-
-#' @export
-setMethod("train",  c(ts_inter = "ts_inter", P = "numeric", Q = "numeric"), train)
 
 #' @export
 setGeneric("values", function(x) standardGeneric("values"))

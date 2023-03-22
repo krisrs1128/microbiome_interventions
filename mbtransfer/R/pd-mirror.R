@@ -6,6 +6,27 @@ consistency_mirror <- function(effects) {
   sgn * magnitude
 }
 
+#' @importFrom dplyr mutate bind_rows row_number
+#' @importFrom tibble tibble
+#' @export
+consistency_mirror_multisplit <- function(effects) {
+  ms <- list()
+  k <- 1
+  for (s in seq_along(effects)) {
+    for (lag in seq_len(dim(effects[[s]])[3])) {
+      ms[[k]] <- tibble(
+        m = consistency_mirror(effects[[s]][,, lag]),
+        lag = lag,
+        multisplit = s
+      ) |>
+        mutate(taxon = row_number())
+      k <- k + 1
+    }
+  }
+
+  bind_rows(ms)
+}
+
 #' @export
 pd_generator <- function(ts, lags) {
   x <- patchify_df(ts, lags[1], lags[2])$x
