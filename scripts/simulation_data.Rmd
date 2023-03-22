@@ -1,9 +1,10 @@
 ---
 title: "Dynamical System Simulation"
-output: html_document
+output: html_document:
+  highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  output_path: "./sim-1.rda"
+  output_path: "./sim_input_1.rda"
   n_subject: 40
   n_time: 30
   n_lag: 5
@@ -102,7 +103,6 @@ interventions <- w_df |>
   filter(time > n_lag) |>
   pull(w, sample) |>
   as.matrix()
-
 
 save(reads, interventions, metadata, subject_data, nonnull_taxa, file = output_path)
 ```

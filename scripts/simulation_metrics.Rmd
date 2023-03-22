@@ -1,7 +1,8 @@
 ---
 title: "Gather Simulation Metrics"
-output: html_document:
-  highlight: "kate"
+output: 
+  html_document:
+    highlight: "kate"
 date: "`r Sys.Date()`"
 params:
   data: "sim_input_1.rda"
@@ -20,8 +21,13 @@ The main parameters are related to cross validation, the method to use, the data
 to use, and any ground truth needed in order to compute metrics.
 
 ```{r}
+library(mbtransfer)
+library(tfPaper)
+```
+
+```{r}
 load(params$data)
-ts <- ts_from_dfs(reads, interventions, samples, subject_data) |>
+ts <- ts_from_dfs(reads, interventions, metadata, subject_data) |>
   interpolate()
 ```
 
@@ -34,7 +40,11 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-hyper <- get(load(params$hyper))
+hyper <- list(P = 1, Q = 1)
+if (!is.null(params$hyper)) {
+  hyper <- get(load(params$hyper))
+}
+
 result <- cross_validate(ts, tr_fun(params$method, hyper))
 # save the cross-validation metrics
 ```
