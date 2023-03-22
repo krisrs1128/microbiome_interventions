@@ -1,3 +1,5 @@
+
+#' @importFrom dplyr pull filter
 #' @export
 ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   subjects <- unique(metadata$subject)
