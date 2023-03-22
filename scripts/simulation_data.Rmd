@@ -1,0 +1,109 @@
+---
+title: "Dynamical System Simulation"
+output: html_document
+date: "`r Sys.Date()`"
+params:
+  output_path: "./sim-1.rda"
+  n_subject: 40
+  n_time: 30
+  n_lag: 5
+  n_taxa: 100
+  n_perturb: 1
+  n_latent: 2
+  n_covariates: 3
+  prop_nonnull: 0.1
+  sparsity_A: 0.8
+  signal_B: 1.5
+  normalizer_C: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(tfPaper)
+set.seed(20230317)
+```
+
+```{r}
+attach(params)
+nonnull_taxa <- seq(n_taxa * prop_nonnull)
+```
+
+This generates the coefficient matrices for dynamics, perturbations, and
+interactions.
+
+```{r}
+A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
+ sparsify() |>
+ normalize(sparsity_A)
+B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, lower = -signal_B, upper = signal_B) |>
+  sparsify_rows(nonnull_taxa)
+C <- low_rank_step_(n_taxa, n_latent, n_perturb, n_lag) |>
+  map(~ sparsify(.) |> normalize(normalizer_C))
+```
+
+Now we can simulate one example series.
+
+For negative binomial simulation, remember that if the variance is $\mu$, the
+variance is $\mu + \frac{1}{\text{size}}\mu^2$, where $\text{size}$ is the
+number of successes before we stop.
+
+```{r}
+step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C))
+theta0 <- matrix(2, n_taxa, n_lag + 1)
+w <- random_interventions(n_perturb, n_time, n_lag)
+z <- matnorm(n_subject, n_covariates)
+
+sizes <- runif(n_taxa, .1, 10)
+baselines <- rgamma(n_taxa, 40, 4)
+x <- generate_samples(step_generator, nbinom_sampler(sizes, baselines), theta0, w, z)
+```
+
+### Postprocess
+
+```{r}
+w_df <- map_dfr(w, ~ as_tibble(.), .id = "subject") |>
+  pivot_longer(-subject, names_to = "time", values_to = "w") |>
+  mutate(
+    time = as.integer(str_remove(time, "V")),
+    value = w,
+    sample = str_c("sam", row_number())
+  )
+```
+
+```{r}
+for (i in seq_along(x)) {
+  x[[i]] <- x[[i]][, -seq_len(n_lag)]
+}
+
+reads <- do.call(cbind, x)
+colnames(reads) <- w_df |>
+  filter(time > n_lag) |>
+  pull(sample)
+reads <- t(reads)
+```
+
+```{r}
+subject_data <- z |>
+  as_tibble() |>
+  mutate(subject = row_number())
+
+metadata <- expand.grid(
+    time = seq_len(n_time),
+    subject = seq_len(n_subject)
+  ) |>
+  mutate(sample = str_c("sam", row_number())) |>
+  filter(time > n_lag)
+
+interventions <- w_df |>
+  filter(time > n_lag) |>
+  pull(w, sample) |>
+  as.matrix()
+
+
+save(reads, interventions, metadata, subject_data, nonnull_taxa, file = output_path)
+```
+
