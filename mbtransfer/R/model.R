@@ -20,7 +20,8 @@ split_future <- function(series_i) {
   list(pre = pre, interventions = interventions)
 }
 
-model_predict_ <- function(fit, ts_inter, new_interventions) {
+#' @export
+mbtransfer_predict <- function(fit, ts_inter, new_interventions) {
   lags <- time_lags(fit[[1]])
   if (!is.list(new_interventions)) {
     new_interventions <- replicate(length(ts_inter), new_interventions, simplify = FALSE)
@@ -34,7 +35,7 @@ model_predict_ <- function(fit, ts_inter, new_interventions) {
   for (i in seq_along(ts_inter)) {
     result[[i]] <- model_predict_single(
       fit, 
-      ts_inter[[i]], 
+      ts_inter[[i]],
       new_interventions[[i]], 
       lags, 
       subject[i,, drop = FALSE]

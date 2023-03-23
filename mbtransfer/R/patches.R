@@ -85,8 +85,9 @@ predictor_names <- function(x_dim, w_dim) {
   c(x_names, w_names)
 }
 
+#' @importFrom stringr str_extract str_detect str_remove
 lag_from_names <- function(names, group = "taxon") {
-  names[str_detect(names, "taxon")] |>
+  names[str_detect(names, group)] |>
     str_extract("lag[0-9]+") |>
     str_remove("lag") |>
     as.numeric() |>
@@ -106,6 +107,7 @@ time_lags <- function(fit) {
   c(P, Q)
 }
 
+#' @importFrom purrr set_names
 predictors <- function(ts_inter, w_next, lags, subject) {
   x <- values(ts_inter)
   w <- interventions(ts_inter)

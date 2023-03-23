@@ -1,5 +1,6 @@
 setClassUnion("data.frameOrNull", members=c("data.frame", "NULL"))
 
+#' @export
 setClass(
   "ts_inter_single", 
   slots = c(
@@ -9,6 +10,7 @@ setClass(
   )
 )
 
+#' @export
 setClass(
   "ts_inter",
   slots = c(
