@@ -1,6 +1,8 @@
 ---
 title: "Dynamical System Simulation"
-output: html_document
+output: 
+  html_document:
+    highlight: "kate"
 date: "`r Sys.Date()`"
 params:
   output_path: "./sim_input_1.rda"
@@ -22,6 +24,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
+library(stringr)
+library(tidygraph)
 library(tidyverse)
 library(tfPaper)
 set.seed(20230317)
@@ -105,8 +109,30 @@ interventions <- w_df |>
   pull(w, sample) |>
   as.matrix()
 colnames(interventions) <- str_c("P", seq_len(params$n_perturb))
-
-taxonomy <- NULL
-save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+```
+```{r}
+taxa_ids <- c(str_c("internal", seq_len(n_taxa), rownames(x[[1]])))
+G <- tbl_graph(edges = rownames(x[[1]]))
+taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
+  activate(edges) |>
+  mutate(
+    tax_name = taxa_ids[to], 
+    name = tax_name,
+    kingdom = "bacteria",
+    phylum = NA,
+    sequence = NA,
+    class = NA,
+    order = NA,
+    family = NA,
+    genus = NA,
+    species = NA
+  ) |>
+  as_tibble() |>
+  rename(tax_id = to, parent_id = from) |>
+  filter(!str_detect(tax_name, "internal")) |>
+  select(tax_id, parent_id, everything())
 ```
 
+```{r}
+save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+```

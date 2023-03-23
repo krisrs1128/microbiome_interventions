@@ -39,29 +39,6 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-library(tidygraph)
-library(stringr)
-
-taxa_ids <- c(str_c("internal", seq_len(nrow(ts[[1]]))), rownames(values(ts[[1]])))
-G <- tbl_graph(edges = rownames(ts[[1]]))
-taxonomy <- create_tree(2 * nrow(ts[[1]]) + 1, 2) |>
-  activate(edges) |>
-  mutate(
-    tax_name = taxa_ids[to], 
-    name = tax_name,
-    kingdom = "bacteria",
-    phylum = NA,
-    sequence = NA,
-    class = NA,
-    order = NA,
-    family = NA,
-    genus = NA,
-    species = NA
-  ) |>
-  as_tibble() |>
-  rename(tax_id = to, parent_id = from) |>
-  filter(!str_detect(tax_name, "internal")) |>
-  select(tax_id, parent_id, everything())
 
 hyper <- list(P = 2, Q = 2, taxonomy = taxonomy)
 if (!is.null(params$hyper)) {
