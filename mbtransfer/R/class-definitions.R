@@ -38,6 +38,8 @@ multi_subset <- function(x, i, j, ..., drop = FALSE) {
 setMethod("length", "ts_inter", function(x) length(x@series))
 setMethod("nrow", "ts_inter_single", function(x) nrow(x@values))
 setMethod("ncol", "ts_inter_single", function(x) ncol(x@values))
+setMethod("colnames", "ts_inter_single", function(x) colnames(x@values))
+setMethod("rownames", "ts_inter_single", function(x) rownames(x@values))
 setMethod("dim", "ts_inter_single", function(x) dim(x@values))
 setMethod("[", c("ts_inter_single", "numeric", "numeric"), single_subset)
 setMethod("[", c("ts_inter_single", "numeric", "missing"), single_subset)

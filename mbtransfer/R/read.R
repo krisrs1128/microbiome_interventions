@@ -13,6 +13,7 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
     
     x <- t(as.matrix(reads[names(sample_ix), ]))
     z <- t(as.matrix(interventions[names(sample_ix), ]))
+    rownames(z) <- colnames(interventions)
     
     series[[i]] <- new(
       "ts_inter_single", 
