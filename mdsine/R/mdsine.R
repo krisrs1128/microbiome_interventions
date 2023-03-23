@@ -175,7 +175,6 @@ check_outputs <- function(data) {
   dummies <- dummy_perturbations(data$perturbations)
   data$perturbations <- resolve_perturbations(data$perturbations, dummies) |>
     pad_zero_interventions(data$metadata)
-  browser()
   data
 }
 
