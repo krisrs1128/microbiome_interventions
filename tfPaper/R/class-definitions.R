@@ -1,5 +1,5 @@
 
-#' @importFrom mbtransfer split_future
+#' @importFrom mbtransfer split_future mbtransfer_predict
 model_predict <- function(object, newdata) {
   fit <- object@parameters
   series <- list()
@@ -12,7 +12,7 @@ model_predict <- function(object, newdata) {
   }
 
   newdata <- new("ts_inter", series = series, subject_data = subject_data(newdata))
-  model_predict_(fit, newdata, new_interventions)
+  mbtransfer_predict(fit, newdata, new_interventions)
 }
 
 setClass(
