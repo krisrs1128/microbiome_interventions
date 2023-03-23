@@ -5,7 +5,7 @@ mdsine <- function(ts_inter, taxonomy) {
   do.call(mdsine_, data)
 }
 
-#' @importFrom reticulate conda_create
+#' @importFrom reticulate conda_create conda_list
 #' @importFrom dplyr filter pull
 #' @importFrom glue glue
 #' @export
@@ -33,7 +33,7 @@ mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, envname = "m
   py$mdsine(dataset, ...)
 }
 
-#' @importFrom mbtransfer ts_inter
+#' @importClassesFrom mbtransfer ts_inter
 #' @export
 forward_simulate <- function(object, newdata, dt=0.25) {
   fit <- object@parameters
