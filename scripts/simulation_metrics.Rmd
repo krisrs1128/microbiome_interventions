@@ -6,8 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data: "sim_input_1.rda"
-  hyper: NULL
-  method: "mbtransfer" # mdsine
+  method: "mdsine" # mdsine
   mirror_counterfactuals: NULL
 ---
 
@@ -40,15 +39,51 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-hyper <- list(P = 2, Q = 2)
+library(tidygraph)
+library(stringr)
+
+taxa_ids <- c(str_c("internal", seq_len(nrow(ts[[1]]))), rownames(values(ts[[1]])))
+G <- tbl_graph(edges = rownames(ts[[1]]))
+taxonomy <- create_tree(2 * nrow(ts[[1]]) + 1, 2) |>
+  activate(edges) |>
+  mutate(
+    tax_name = taxa_ids[to], 
+    name = tax_name,
+    kingdom = "bacteria",
+    phylum = NA,
+    sequence = NA,
+    class = NA,
+    order = NA,
+    family = NA,
+    genus = NA,
+    species = NA
+  ) |>
+  as_tibble() |>
+  rename(tax_id = to, parent_id = from) |>
+  filter(!str_detect(tax_name, "internal")) |>
+  select(tax_id, parent_id, everything())
+
+hyper <- list(P = 2, Q = 2, taxonomy = taxonomy)
 if (!is.null(params$hyper)) {
   hyper <- get(load(params$hyper))
 }
 
-result <- cross_validate(ts, tr_fun(params$method, hyper))
-result$metrics
+#result <- cross_validate(ts, tr_fun(params$method, hyper))
+#result$metrics
 # save the cross-validation metrics
 ```
+
+```{r}
+library(reticulate)
+library(tidyverse)
+library(fs)
+library(glue)
+use_condaenv("mdsine")
+source("../mdsine/R/mdsine.R")
+
+mdsine(ts, taxonomy) # but not this
+```
+
 
 Next, the hypothesis testing metrics.
 
@@ -75,3 +110,4 @@ Next, the hypothesis testing metrics.
 # save the false discovery rate metrics. We'll have a separate script for DESeq2
 # / metagenomeSeq etc.
 ```
+

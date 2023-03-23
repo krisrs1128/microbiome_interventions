@@ -1,7 +1,6 @@
 ---
 title: "Dynamical System Simulation"
-output: html_document:
-  highlight: "kate"
+output: html_document
 date: "`r Sys.Date()`"
 params:
   output_path: "./sim_input_1.rda"
@@ -87,6 +86,7 @@ colnames(reads) <- w_df |>
 reads <- t(reads)
 ```
 
+
 ```{r}
 subject_data <- z |>
   as_tibble() |>
@@ -97,13 +97,16 @@ metadata <- expand.grid(
     subject = seq_len(n_subject)
   ) |>
   mutate(sample = str_c("sam", row_number())) |>
-  filter(time > n_lag)
+  filter(time > n_lag) |>
+  mutate(time = time - n_time / 2)
 
 interventions <- w_df |>
   filter(time > n_lag) |>
   pull(w, sample) |>
   as.matrix()
+colnames(interventions) <- str_c("P", seq_len(params$n_perturb))
 
-save(reads, interventions, metadata, subject_data, nonnull_taxa, file = output_path)
+taxonomy <- NULL
+save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
