@@ -13,3 +13,6 @@ RUN wget \
     && rm -f Miniconda3-latest-Linux-x86_64.sh 
 RUN Rscript -e "install.packages(c('xgboost', 'MCMCpack', 'reticulate', 'slider', 'vctrs', 'igraph'))"
 RUN Rscript -e "install.packages('BiocManager'); BiocManager::install(c('phyloseq', 'DESeq2')); devtools::install_github('ruochenj/mbImpute/mbImpute R package')"
+
+ENV HOME="/home/"
+RUN chmod -R 777 /home/ /usr/local/
