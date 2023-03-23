@@ -22,7 +22,8 @@ install_mdsine <- function(envname = "mdsine") {
 #' @export
 mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, envname = "mdsine", ...) {
   use_condaenv(envname)
-  source_python(system.file("mdsine.py", package = "mdsine"))
+  #source_python(system.file("mdsine.py", package = "mdsine"))
+  source_python("/Users/ksankaran/Desktop/collaborations/microbiome_interventions/mdsine/inst/mdsine.py")
   f <- path(tempdir())
   vars <- c("taxonomy", "reads", "qpcr", "metadata", "perturbations")
   paths <- map(vars, ~ f / glue("{.}.tsv"))
@@ -100,6 +101,10 @@ endpoints <- function(z) {
       end_ix <- c(end_ix, i + 1)
     }
   }
+  
+  if (z[length(z)] != 0) {
+    end_ix <- c(end_ix, length(z))
+  }
 
   list(start = start_ix, end = end_ix)
 }
@@ -148,9 +153,29 @@ resolve_perturbations <- function(perturbations, dummies) {
   perturbations
 }
 
+pad_zero_interventions <- function(perturbations, metadata) {
+  subjects <- unique(perturbations$subject)
+  for (s in seq_along(subjects)) {
+    final_time <- metadata |>
+      filter(subject == subjects[s]) |>
+      slice_max(time) |>
+      pull(time)
+    perturbations <- perturbations |>
+      mutate(
+        current_subject = subject == subjects[s],
+        end = ifelse(current_subject & (end == final_time), end - 2, end)
+      ) |>
+      select(-current_subject)
+  }
+  
+  perturbations
+}
+
 check_outputs <- function(data) {
   dummies <- dummy_perturbations(data$perturbations)
-  data$perturbations <- resolve_perturbations(data$perturbations, dummies)
+  data$perturbations <- resolve_perturbations(data$perturbations, dummies) |>
+    pad_zero_interventions(data$metadata)
+  browser()
   data
 }
 
@@ -168,7 +193,7 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
   if (is.null(qpcr)) {
     qpcr <- tibble(
       sampleID = sample_names,
-      measurement1 = rnorm(sample_names, 1e9, 100),
+      measurement1 = rnorm(N, 1e9, 100),
       measurement2 = rnorm(N, 1e9, 100),
       measurement3 = rnorm(N, 1e9, 100)
     )
@@ -182,6 +207,7 @@ md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
     qpcr = qpcr
   )
 
+  
   for (i in seq_along(ts_inter)) {
     data$reads[[i]] <- values(ts_inter[[i]]) %>%
       data.frame() %>%
