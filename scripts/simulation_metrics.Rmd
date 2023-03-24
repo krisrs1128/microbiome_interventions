@@ -61,8 +61,15 @@ tr_fun <- function(method, hyper = list()) {
 }
 
 result <- cross_validate(ts, tr_fun(params$method, hyper))
-#result$metrics
+metrics <- result$metrics
 # save the cross-validation metrics
+```
+
+```{r}
+start <- Sys.time()
+tr_fun(ts)
+time_diff <- Sys.time() - start
+save(metrics, time_diff, file = output_path)
 ```
 
 Next, the hypothesis testing metrics.
