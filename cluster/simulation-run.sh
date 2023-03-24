@@ -7,12 +7,18 @@ Rscript -e "purrr::map(c('mbtransfer', 'mdsine', 'tfPaper'), devtools::install);
 Rscript -e "mdsine::install_mdsine()"
 cd scripts
 
+# copy over data  
+cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .
+tar -zxvf tf_sim.tar.gz
+
 # run the model configuration
 PROCESS=$((PROCESS - 1))
 for i in $(seq $((10 * PROCESS + 1)) $((10 * (PROCESS + 1)))); do
   export RUN=$(printf %03d $i)
-  cp /staging/groups/sankaran_group/microbiome_interventions/sim_input_${RUN}.rda .
   Rscript -e "rmarkdown::render('simulation_metrics.Rmd', params = list(data = 'sim_input_${RUN}.rda', run_id=${i}))"
-  cp result*.rda /staging/groups/sankaran_group/microbiome_interventions/
 done
 
+mkdir result-${PROCESS}
+mv result* result-${PROCESS}
+tar -zcvf tf_sim_result-${PROCESS}.tar.gz result-${PROCESS}
+cp tf_sim_result*tar.gz /staging/ksankaran/microbiome_interventions/
