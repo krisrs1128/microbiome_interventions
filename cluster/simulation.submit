@@ -1,0 +1,11 @@
+universe = docker
+docker_image = ksankaran/mi:20230323
+log = /home/ksankaran/logs/mi-$(Process).log
+error = /home/ksankaran/logs/mi-$(Process).err
+output = /home/ksankaran/logs/mi-$(Process).out
+executable = simulation-run.sh
+request_cpus = 1
+request_memory = 6GB
+request_disk = 5GB
+requirements = (Target.HasCHTCStaging == true)
+queue 4
