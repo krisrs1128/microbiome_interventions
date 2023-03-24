@@ -22,8 +22,7 @@ install_mdsine <- function(envname = "mdsine") {
 #' @export
 mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, envname = "mdsine", ...) {
   use_condaenv(envname)
-  #source_python(system.file("mdsine.py", package = "mdsine"))
-  source_python("/Users/ksankaran/Desktop/collaborations/microbiome_interventions/mdsine/inst/mdsine.py")
+  source_python(system.file("mdsine.py", package = "mdsine"))
   f <- path(tempdir())
   vars <- c("taxonomy", "reads", "qpcr", "metadata", "perturbations")
   paths <- map(vars, ~ f / glue("{.}.tsv"))

@@ -46,7 +46,7 @@ load(params$data)
 hyper$taxonomy <- taxonomy
 
 ts <- reads |>
-  normalize(params$method, metadata) |>
+  normalize(normalization, metadata) |>
   ts_from_dfs(interventions, metadata, subject_data) |>
   interpolate()
 ```
@@ -60,7 +60,7 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-result <- cross_validate(ts, tr_fun(params$method, hyper))
+result <- cross_validate(ts, tr_fun(method, hyper))
 metrics <- result$metrics
 # save the cross-validation metrics
 ```
