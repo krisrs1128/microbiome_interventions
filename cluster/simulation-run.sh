@@ -3,7 +3,9 @@
 
 
 # install packages
-Rscript -e "purrr::map(c('mbtransfer', 'mdsine', 'tfPaper'), devtools::install); mdsine::install_mdsine()"
+tar -zxvf microbiome_interventions.tar.gz
+cd microbiome_interventions
+Rscript -e "purrr::map(c('mbtransfer', 'mdsine', 'tfPaper'), devtools::install)"
 Rscript -e "mdsine::install_mdsine()"
 
 # copy over data  
