@@ -5,34 +5,47 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  output_path: "./sim_input_1.rda"
-  n_subject: 40
-  n_time: 30
-  n_lag: 5
-  n_taxa: 100
-  n_perturb: 1
-  n_latent: 2
-  n_covariates: 3
-  prop_nonnull: 0.1
-  sparsity_A: 0.8
-  signal_B: 1.5
-  normalizer_C: 1
+  run_id: 2
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
-
 ```{r}
 library(stringr)
+library(glue)
 library(tidygraph)
 library(tidyverse)
 library(tfPaper)
-set.seed(20230317)
+set.seed(params$replicate)
 ```
 
 ```{r}
-attach(params)
+fixed_parameters <- list(
+  n_perturb = 1, 
+  n_covariates = 3, 
+  n_latent = 2, 
+  normalizer_A = 0.8, 
+  normalizer_C = 0.8
+)
+
+varying_parameters <- expand.grid(
+  n_subject = c(20, 40),
+  n_time = c(15, 30),
+  n_lag = c(2, 4),
+  n_taxa = c(100, 250),
+  prop_nonnull = c(0.05, 0.2),
+  sparsity_A = c(0.2, 0.8),
+  signal_B = c(0.5, 1, 2),
+  replicate = seq_len(4)
+) |>
+  mutate(output_path = glue("~/Downloads/sim_input_{str_pad(row_number(), 3, 'left', '0')}.rda"))
+
+attach(fixed_parameters)
+attach(as.list(varying_parameters[params$run, ]))
+```
+
+```{r}
 nonnull_taxa <- seq(n_taxa * prop_nonnull)
 ```
 
@@ -41,12 +54,12 @@ interactions.
 
 ```{r}
 A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
- sparsify() |>
- normalize(sparsity_A)
+ sparsify(sparsity_A) |>
+ normalize_mat(normalizer_A)
 B <- low_rank_step(n_taxa, n_latent, n_perturb, n_lag, lower = -signal_B, upper = signal_B) |>
   sparsify_rows(nonnull_taxa)
 C <- low_rank_step_(n_taxa, n_latent, n_perturb, n_lag) |>
-  map(~ sparsify(.) |> normalize(normalizer_C))
+  map(~ sparsify(.) |> normalize_mat(normalizer_C))
 ```
 
 Now we can simulate one example series.
@@ -108,11 +121,10 @@ interventions <- w_df |>
   filter(time > n_lag) |>
   pull(w, sample) |>
   as.matrix()
-colnames(interventions) <- str_c("P", seq_len(params$n_perturb))
+colnames(interventions) <- str_c("P", seq_len(n_perturb))
 ```
 ```{r}
 taxa_ids <- c(str_c("internal", seq_len(n_taxa), rownames(x[[1]])))
-G <- tbl_graph(edges = rownames(x[[1]]))
 taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
   activate(edges) |>
   mutate(
@@ -135,4 +147,13 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 
 ```{r}
 save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+```
+
+```{r, eval = FALSE}
+for (i in seq_len(768)) {
+  if (i %% 10 == 0) {
+    print(glue("{i}/768"))
+  }
+  rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
+}
 ```

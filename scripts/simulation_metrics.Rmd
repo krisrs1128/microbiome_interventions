@@ -5,13 +5,35 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  data: "sim_input_1.rda"
-  method: "mdsine" # mdsine
-  mirror_counterfactuals: NULL
+  data: "~/Downloads/sim_input_001.rda"
+  run_id: 1
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(glue)
+library(tidyverse)
+library(mbtransfer)
+library(tfPaper)
+set.seed(123)
+```
+
+```{r}
+configurations <- expand.grid(
+  method_hyper = c("mbtransfer-1", "mbtransfer-2", "mdsine"),
+  normalization = c("none", "DESeq2", "relative_abundance", "mbImpute")
+) |>
+  separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
+  mutate(
+    hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
+    output_path = glue("result_{row_number()}.rda")
+  )
+
+attach(as.list(configurations[params$run_id, ]))
+hyper <- hyper[[1]]
 ```
 
 This script doesn't presume to know which input datasets are to be considered.
@@ -20,13 +42,12 @@ The main parameters are related to cross validation, the method to use, the data
 to use, and any ground truth needed in order to compute metrics.
 
 ```{r}
-library(mbtransfer)
-library(tfPaper)
-```
-
-```{r}
 load(params$data)
-ts <- ts_from_dfs(log(1 + reads), interventions, metadata, subject_data) |>
+hyper$taxonomy <- taxonomy
+
+ts <- reads |>
+  normalize(params$method, metadata) |>
+  ts_from_dfs(interventions, metadata, subject_data) |>
   interpolate()
 ```
 
@@ -39,28 +60,10 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-
-hyper <- list(P = 2, Q = 2, taxonomy = taxonomy)
-if (!is.null(params$hyper)) {
-  hyper <- get(load(params$hyper))
-}
-
-#result <- cross_validate(ts, tr_fun(params$method, hyper))
+result <- cross_validate(ts, tr_fun(params$method, hyper))
 #result$metrics
 # save the cross-validation metrics
 ```
-
-```{r}
-library(reticulate)
-library(tidyverse)
-library(fs)
-library(glue)
-use_condaenv("mdsine")
-source("../mdsine/R/mdsine.R")
-
-mdsine(ts, taxonomy) # but not this
-```
-
 
 Next, the hypothesis testing metrics.
 

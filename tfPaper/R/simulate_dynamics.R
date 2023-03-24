@@ -81,7 +81,7 @@ low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
 }
 
 #' @export
-normalize <- function(A, lambda = 0.9) {
+normalize_mat <- function(A, lambda = 0.9) {
   for (i in seq_along(A)) {
     A[[i]] <- lambda * A[[i]] / max(svd(A[[i]])$d[1])
   }

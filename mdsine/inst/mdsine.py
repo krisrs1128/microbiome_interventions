@@ -56,4 +56,3 @@ def forward_simulate(fit, x0, perturbations=None, starts=None, ends=None,
     perturbation_ends=ends
   )
   return md2.integrate(dynamics=dyn, dt=dt, n_days=n_days, initial_conditions=x0)
-

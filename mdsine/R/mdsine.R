@@ -153,7 +153,7 @@ resolve_perturbations <- function(perturbations, dummies) {
   perturbations
 }
 
-pad_zero_interventions <- function(perturbations, metadata) {
+endpad_interventions <- function(perturbations, metadata) {
   subjects <- unique(perturbations$subject)
   for (s in seq_along(subjects)) {
     final_time <- metadata |>
@@ -174,7 +174,7 @@ pad_zero_interventions <- function(perturbations, metadata) {
 check_outputs <- function(data) {
   dummies <- dummy_perturbations(data$perturbations)
   data$perturbations <- resolve_perturbations(data$perturbations, dummies) |>
-    pad_zero_interventions(data$metadata)
+    endpad_interventions(data$metadata)
   data
 }
 
