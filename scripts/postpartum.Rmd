@@ -1,0 +1,115 @@
+---
+title: "Untitled"
+output: html_document
+params:
+  root_dir: "~/Desktop/collaborations/microbiome_transfer_data/post/data/"
+date: "`r Sys.Date()`"
+---
+
+```{r}
+library(tidyverse)
+library(fs)
+```
+
+```{r}
+root_dir <- path(params$root_dir)
+load(root_dir / "data_post.RData")
+```
+
+```{r}
+post.df <- post.df |>
+  filter(PregOut != "Miscarriage", MonVsDel %in% -7:13, LibrarySize >= 4e4) |>
+  group_by(SubjID) |>
+  filter(max(DayVsDel) > 4, n() > 4)
+
+sample_data <- post.df |>
+  rename(sample = SampleID, subject = SubjID, time = DayVsDel)
+
+reads <- post.df |>
+  ungroup() |>
+  select(SampleID, Lactobacillus:L.other) |>
+  column_to_rownames("SampleID")
+  
+subject_data <- post.df |>
+  select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
+  rename(subject = SubjID) |>
+  group_by(subject) |>
+  filter(row_number() == 1)
+```
+
+```{r}
+interventions <- sample_data |>
+  mutate(birth = 1 * (time > -14 & time < 0)) |>
+  ungroup() |>
+  select(sample, birth) |>
+  column_to_rownames("sample")
+```
+
+```{r}
+#interventions <- 
+sample_data |>
+  left_join(interventions |> rownames_to_column("sample")) |>
+  ggplot() +
+  geom_point(aes(time, subject, col = birth))
+```
+
+```{r}
+ts <- ts_from_dfs(reads, interventions, sample_data, subject_data)
+```
+
+```{r}
+ts_ <- interpolate(ts, delta = 14, method = "linear")
+```
+
+```{r}
+plot(values(ts_[[1]])[8, ])
+```
+
+
+```{r}
+values_df <- map_dfr(ts_, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
+  pivot_longer(Lactobacillus:L.other, names_to = "taxon")
+```
+
+```{r}
+values_df |>
+  filter(taxon %in% c("Lactobacillus")) |>
+  ggplot() +
+  geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
+  scale_fill_distiller(direction = 1) +
+  scale_color_distiller(direction = 1)
+
+values_df |>
+  filter(taxon %in% c("L.gasseri")) |>
+  ggplot() +
+  geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
+  scale_fill_distiller(direction = 1) +
+  scale_color_distiller(direction = 1)
+```
+
+```{r, fig.height = 10, fig.width = 10}
+library(ggHoriPlot)
+
+cutpoints <- quantile(reads$Bifidobacterium, seq(0, 1, length.out = 25)) |>
+  round(5) |>
+  unique()
+
+taxa <- "Lactobacillus"
+values_df |>
+  filter(taxon %in% taxa) |>
+  ggplot() +
+  geom_horizon(aes(time, value, fill = ..Cutpoints..), origin = 0.5, horizonscale = cutpoints) +
+  scale_fill_hcl(palette = 'RdBu') +
+  facet_grid(reorder(subject, -value) ~ .) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  theme(
+    strip.text.y = element_text(angle = 0),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.spacing = unit(0, "cm")
+  ) +
+  labs(title = taxa)
+
+```
+
