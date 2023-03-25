@@ -7,8 +7,11 @@ date: "`r Sys.Date()`"
 ---
 
 ```{r}
-library(tidyverse)
+library(RColorBrewer)
 library(fs)
+library(tidyverse)
+library(mbtransfer)
+theme_set(theme_bw())
 ```
 
 ```{r}
@@ -32,6 +35,8 @@ reads <- post.df |>
   
 subject_data <- post.df |>
   select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
+  ungroup() |>
+  mutate(bmi_cut = cut(BmiPre, breaks = quantile(subject_data$BmiPre, seq(0, 1, length.out = 4)))) |>
   rename(subject = SubjID) |>
   group_by(subject) |>
   filter(row_number() == 1)
@@ -72,44 +77,76 @@ values_df <- map_dfr(ts_, ~ bind_cols(rownames_to_column(data.frame(t(values(.))
 ```
 
 ```{r}
-values_df |>
-  filter(taxon %in% c("Lactobacillus")) |>
-  ggplot() +
-  geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
-  scale_fill_distiller(direction = 1) +
-  scale_color_distiller(direction = 1)
+subject_order <- function(values_df, taxa) {
+  values_wide <- values_df |>
+    filter(taxon %in% taxa) |>
+    select(subject, taxon, value, time) |>
+    mutate(time = round(time, -1)) |>
+    unite("txtime", taxon, time) |>
+    pivot_wider(names_from = txtime) |>
+    column_to_rownames("subject") |>
+    as.matrix()
+  
+  values_wide[is.na(values_wide)] <- 0
+  rownames(values_wide)[hclust(dist(values_wide))$order]
+}
 
-values_df |>
-  filter(taxon %in% c("L.gasseri")) |>
-  ggplot() +
-  geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
-  scale_fill_distiller(direction = 1) +
-  scale_color_distiller(direction = 1)
+interaction_hm <- function(values_df, subject_data, taxa, condition) {
+  values_df |>
+    filter(taxon %in% taxa) |>
+    left_join(subject_data) |>
+    mutate(subject = factor(subject, subject_order(values_df, taxa))) |>
+    ggplot() +
+    geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
+    scale_x_continuous(expand = c(0, 0)) +
+    facet_grid(.data[[condition]] ~ reorder(taxon, -value), scales = "free", space = "free") +
+    scale_fill_distiller(direction = 1) +
+    scale_color_distiller(direction = 1) +
+    theme(
+      strip.text.y = element_text(angle = 0),
+      panel.grid = element_blank(),
+      panel.border = element_rect(linewidth = 1, fill = NA, color = "#545454"),
+      panel.spacing = unit(0, "cm")
+    )
+}
 ```
 
-```{r, fig.height = 10, fig.width = 10}
-library(ggHoriPlot)
 
-cutpoints <- quantile(reads$Bifidobacterium, seq(0, 1, length.out = 25)) |>
-  round(5) |>
-  unique()
-
-taxa <- "Lactobacillus"
-values_df |>
-  filter(taxon %in% taxa) |>
-  ggplot() +
-  geom_horizon(aes(time, value, fill = ..Cutpoints..), origin = 0.5, horizonscale = cutpoints) +
-  scale_fill_hcl(palette = 'RdBu') +
-  facet_grid(reorder(subject, -value) ~ .) +
-  scale_y_continuous(expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0)) +
-  theme(
-    strip.text.y = element_text(angle = 0),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank(),
-    panel.spacing = unit(0, "cm")
-  ) +
-  labs(title = taxa)
-
+```{r}
+taxa <- c("L.gasseri", "Lactobacillus", "Gardnerella")
+interaction_hm(values_df, subject_data, taxa, "Race")
+interaction_hm(values_df, subject_data, taxa, "BirthControlYesNo")
+interaction_hm(values_df, subject_data, taxa, "bmi_cut")
 ```
+
+```{r}
+interaction_barcode <- function(values_df, subject_data, taxa, condition) {
+  values_df |>
+    filter(taxon %in% taxa) |>
+    left_join(subject_data) |>
+    mutate(subject = factor(subject, levels = subject_order(values_df, taxa))) |>
+    ggplot() +
+    geom_tile(aes(time, taxon, fill = value, col = value), width = 14) +
+    scale_x_continuous(expand = c(0, 0)) +
+    facet_nested(reorder(.data[[condition]], -value) + subject ~ ., scales = "free", space = "free") +
+    scale_fill_distiller(direction = 1) +
+    scale_color_distiller(direction = 1) +
+    theme(
+      panel.spacing = unit(0, "line"),
+      panel.border = element_rect(linewidth = 1, fill = NA, color = "#d3d3d3"),
+      strip.text.y = element_text(angle = 0),
+      panel.grid = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    )
+}
+```
+
+```{r, fig.height = 12, fig.width = 6}
+interaction_barcode(values_df, subject_data, taxa, "Race")
+interaction_barcode(values_df, subject_data, taxa, "BirthControlYesNo")
+interaction_barcode(values_df, subject_data, taxa, "bmi_cut")
+```
+
+
 
