@@ -49,11 +49,13 @@ pd_generator <- function(ts, lags) {
   }
 }
 
+#' @export
 pd_effects <- function(pd, fit, w0, w1) {
   pd(fit, w1) - pd(fit, w0)
 }
 
-pd_splits <- function(ts, w0, w1, n_splits, method = "gbm", ...) {
+#' @export
+pd_splits <- function(ts, w0, w1, n_splits, method = "mbtransfer", ...) {
   effects <- replicate(n_splits, array(dim = c(nrow(ts[[1]]), 2, nrow(w0))), simplify = FALSE)
 
   for (s in seq_len(n_splits)) {
@@ -76,4 +78,42 @@ pd_splits <- function(ts, w0, w1, n_splits, method = "gbm", ...) {
   }
   
   effects
+}
+
+# https://stackoverflow.com/questions/18715580/algorithm-to-calculate-power-set-all-possible-subsets-of-a-set-in-r
+all_subsets <- function(set) { 
+  n <- length(set)
+  masks <- 2^(1:n-1)
+  lapply(1:2^n-1, function(u) set[ bitwAnd(u, masks) != 0 ])
+}
+
+#' @export
+counterfactual_interventions <- function(n_lag = 1, n_intervention = 1) {
+  indep_interventions <- list(w0 = list(), w1 = list())
+  for (k in seq_len(n_intervention)) {
+    indep_interventions$w0[[k]] <- counterfactual_interventions_(n_lag, k)$w0
+    indep_interventions$w1[[k]] <- counterfactual_interventions_(n_lag, k)$w1
+  }
+  
+  result <- list(w0 = list(), w1 = list())
+  S <- all_subsets(seq_len(n_interventions))[-1]
+  for (i in seq_along(S)) {
+    ix <- S[[i]]
+    result$w0[[i]] <- do.call(cbind, indep_interventions$w0)
+    tmp <- c(indep_interventions$w0[-ix], indep_interventions$w1[ix])
+    tmp <- do.call(cbind, tmp)
+    result$w1[[i]] <- tmp[, order(colnames(tmp))]
+  }
+  
+  map(result, ~ do.call(rbind, .))
+}
+
+counterfactual_interventions_ <- function(n_lag = 1, k = 1) {
+  w0 <- matrix(0, n_lag, n_lag)
+  colnames(w0) <- glue("intervention{k}_lag{seq(0, n_lag - 1)}")
+  w1 <- w0
+  for (i in seq_len(n_lag)) {
+    w1[i, ] <- c(rep(1, i), rep(0, n_lag - i))
+  }
+  list(w0 = w0, w1 = w1)
 }

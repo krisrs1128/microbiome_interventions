@@ -18,7 +18,7 @@ library(glue)
 library(tidyverse)
 library(mbtransfer)
 library(tfPaper)
-set.seed(123)
+set.seed(20230325)
 ```
 
 ```{r}
@@ -29,11 +29,10 @@ configurations <- expand.grid(
   separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
   mutate(
     hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
-    output_path = glue("result_{row_number()}.rda")
+    output_path = glue("result_{str_pad(row_number(), 3, 'left', '0')}.rda")
   )
 
 attach(as.list(configurations[params$run_id, ]))
-hyper <- hyper[[1]]
 ```
 
 This script doesn't presume to know which input datasets are to be considered.
@@ -43,7 +42,7 @@ to use, and any ground truth needed in order to compute metrics.
 
 ```{r}
 load(params$data)
-hyper$taxonomy <- taxonomy
+hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
 
 ts <- reads |>
   normalize(normalization, metadata) |>
@@ -62,39 +61,51 @@ tr_fun <- function(method, hyper = list()) {
 
 result <- cross_validate(ts, tr_fun(method, hyper))
 metrics <- result$metrics
-# save the cross-validation metrics
 ```
+
+we can evaluate the overall training time
 
 ```{r}
 start <- Sys.time()
-tr_fun(ts)
+fit <- tr_fun(method, hyper)(ts)
 time_diff <- Sys.time() - start
-save(metrics, time_diff, file = output_path)
 ```
 
 Next, the hypothesis testing metrics.
 
 ```{r}
-#load(params$mirror_counterfactuals)
-#effects <- pd_splits(ts, w0, w1, 20, method = params$method)
-#ms <- consistency_mirror_multiple(effects)
+lags <- mbtransfer:::time_lags(fit@parameters[[1]])
+n_interventions <- nrow(interventions(ts[[1]]))
+w <- counterfactual_interventions(lags[2], n_interventions)
+effects <- pd_splits(ts, w$w0, w$w1, 20, method = method, hyper = hyper)
+ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r}
-#ms <- ms |>
-#  mutate(truth = taxon %in% nonnull_taxa)
-# ms_ <- ms |>
-#   select(multisplit, m_, lag) %>% 
-#   split(.$lag) %>%
-#   map(~ split(., .$multisplit) %>% map(~ pull(., m_)))
-# 
-# lag <- 3
-# if nonnull_taxa not present, then skip tteh evaluation
-# R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
-# S <- intersect(nonnull_taxa_,  R)
-# V <- setdiff(R, nonnull_taxa_)
+ms <- ms |>
+ mutate(truth = taxon %in% nonnull_taxa)
+ms_ <- ms |>
+  select(multisplit, m, lag) %>%
+  split(.$lag) %>%
+  map(~ split(., .$multisplit) %>% map(~ pull(., m)))
 
-# save the false discovery rate metrics. We'll have a separate script for DESeq2
-# / metagenomeSeq etc.
+# we should have a version with different nonnull taxa per lag
+lag <- 1
+R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
+S <- intersect(str_c("tax", nonnull_taxa),  R)
+V <- setdiff(R, str_c("tax", nonnull_taxa))
+
+testing_results <- list(
+  fdp = length(V) / length(R),
+  power = length(S) / length(nonnull_taxa)
+)
+```
+
+```{r}
+save(metrics, time_diff, testing_results, file = output_path)
+```
+
+```{r}
+sessionInfo()
 ```
 

@@ -94,6 +94,7 @@ lag_from_names <- function(names, group = "taxon") {
     max()
 }
 
+#' @export
 time_lags <- function(fit) {
   # different names for gbm and lasso, resp.
   if (!is.null(fit$feature_names)) {
