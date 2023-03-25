@@ -14,7 +14,10 @@ install_mdsine <- function(envname = "mdsine") {
   path <- conda_list() |>
     filter(name == envname) |>
     pull(python)
-  system(glue("{path} -m pip install {system.file('MDSINE2', package = 'mdsine')}"))
+  md_dir <- path(tempdir())
+  download.file("https://github.com/gerberlab/MDSINE2/archive/fac880c8c096464cd9a80e72b930cfcf3bd88f21.zip", md_dir / "mdsine2.zip")
+  unzip(md_dir / "mdsine2.zip")
+  system(glue("{path} -m pip install MDSINE2-fac880c8c096464cd9a80e72b930cfcf3bd88f21/"))
 }
 
 #' @importFrom fs path
