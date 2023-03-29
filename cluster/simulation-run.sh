@@ -13,16 +13,13 @@ cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .
 tar -zxvf tf_sim.tar.gz
 
 # run the model configuration
-echo "Process"
-echo $PROCESS
-export PROCESS=$((PROCESS - 1))
-echo $PROCESS
-for i in $(seq $((10 * PROCESS + 1)) $((10 * (PROCESS + 1)))); do
+export process=$((process - 1))
+for i in $(seq $((10 * process + 1)) $((10 * (process + 1)))); do
   export RUN=$(printf %03d $i)
   Rscript -e "rmarkdown::render('scripts/simulation_metrics.Rmd', params = list(data = 'tf_sim/sim_input_${RUN}.rda', run_id=${i}))"
 done
 
-mkdir result-${PROCESS}
-mv result*rda result-${PROCESS}
-tar -zcvf tf_sim_result-${PROCESS}.tar.gz result-${PROCESS}
+mkdir result-${process}
+mv result*rda result-${process}
+tar -zcvf tf_sim_result-${process}.tar.gz result-${process}
 cp tf_sim_result*tar.gz /staging/ksankaran/microbiome_interventions/

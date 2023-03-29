@@ -22,8 +22,11 @@ intervention_start <- function(interventions, offset = 0) {
 evaluation <- function(y, y_hat, test_ix) {
   residuals <- list()
   avg_err <- list()
-  
+
   for (i in seq_along(y)) {
+    test_ix[[i]] <- intersect(test_ix[[i]], seq_len(ncol(y_hat[[i]])))
+    if (length(test_ix) == 0) next
+
     residuals[[i]]<- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
     avg_err[[i]] <- data.frame(
       mse = mean(residuals[[i]] ^ 2),
@@ -58,12 +61,8 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
     }
     
     y_hat[[k]] <- predict(fits[[k]], stest)
-    for (h in seq_len(n_ahead)) {
-      test_ix <- list()
-      for (i in seq_along(stest)) {
-        test_ix[[i]] <- seq(t_starts[i], min(t_starts[i] + h, ncol(y_hat[[k]][[i]])))
-      }
-      
+    for (h in seq(0, n_ahead)) {
+      test_ix <- as.list(t_starts + h)
       metrics[[glue("{k}-{h}")]] <- evaluation(splits$test, y_hat[[k]], test_ix)
     }
   }

@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data: "tf_sim//sim_input_768.rda"
-  run_id: 10
+  run_id: 4
 ---
 
 ```{r setup, include=FALSE}
@@ -41,7 +41,6 @@ The main parameters are related to cross validation, the method to use, the data
 to use, and any ground truth needed in order to compute metrics.
 
 ```{r}
-print(params$data)
 load(params$data)
 hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
 
@@ -51,6 +50,7 @@ metadata <- metadata |>
   left_join(interventions_df) |>
   rename(condition = P1)
 rownames(metadata) <- metadata$sample
+reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
 
 ts <- reads |>
   normalize(normalization, metadata) |>
@@ -72,11 +72,9 @@ metrics <- result$metrics
 ```
 
 ```{r}
-values_mat <- do.call(rbind, map(ts@series, ~ values(.)))
-reference_ae <- mean(abs(values_mat - mean(values_mat)))
 ggplot(metrics) +
   geom_boxplot(aes(lag, mae)) +
-  geom_hline(yintercept = reference_ae)
+  scale_y_log10()
 ```
 
 we can evaluate the overall training time
@@ -93,12 +91,11 @@ Next, the hypothesis testing metrics.
 lags <- time_lags(fit@parameters[[1]])
 n_interventions <- nrow(interventions(ts[[1]]))
 w <- counterfactual_interventions(lags[2], n_interventions)
-effects <- pd_splits(ts, w$w0, w$w1, 2, method = method, hyper = hyper)
+effects <- pd_splits(ts, w$w0, w$w1, 20, method = method, hyper = hyper)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r}
-ms0 <- ms
 ms <- ms |>
  mutate(
    truth = taxon %in% nonnull_taxa,
