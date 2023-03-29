@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data: "tf_sim//sim_input_768.rda"
-  run_id: 4
+  run_id: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -24,12 +24,12 @@ set.seed(20230325)
 ```{r}
 configurations <- expand.grid(
   method_hyper = c("mbtransfer-1", "mbtransfer-2", "mdsine"),
-  normalization = c("none", "DESeq2", "relative_abundance", "mbImpute")
+  normalization = c("none", "DESeq2", "mbImpute")
 ) |>
   separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
   mutate(
     hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
-    output_path = glue("result_{str_pad(row_number(), 3, 'left', '0')}.rda")
+    output_path = glue("result-{str_pad(row_number(), 2, 'left', '0')}-{basename(params$data)}")
   )
 
 attach(as.list(configurations[params$run_id, ]))
