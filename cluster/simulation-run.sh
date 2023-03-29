@@ -16,7 +16,7 @@ tar -zxvf tf_sim.tar.gz
 PROCESS=$((PROCESS - 1))
 for i in $(seq $((10 * PROCESS + 1)) $((10 * (PROCESS + 1)))); do
   export RUN=$(printf %03d $i)
-  Rscript -e "rmarkdown::render('scripts/simulation_metrics.Rmd', params = list(data = '../tf_sim/sim_input_${RUN}.rda', run_id=${i}))"
+  Rscript -e "rmarkdown::render('scripts/simulation_metrics.Rmd', params = list(data = 'tf_sim/sim_input_${RUN}.rda', run_id=${i}))"
 done
 
 mkdir result-${PROCESS}

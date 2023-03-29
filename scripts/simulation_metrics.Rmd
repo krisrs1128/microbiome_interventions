@@ -41,6 +41,7 @@ The main parameters are related to cross validation, the method to use, the data
 to use, and any ground truth needed in order to compute metrics.
 
 ```{r}
+print(params$data)
 load(params$data)
 hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
 
