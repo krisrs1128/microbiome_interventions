@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  data: "~/Downloads/sim_input_001.rda"
+  data: "tf_sim//sim_input_681.rda"
   run_id: 1
 ---
 
@@ -59,8 +59,16 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-result <- cross_validate(ts, tr_fun(method, hyper))
+result <- cross_validate(ts, tr_fun(method, hyper), K = 2)
 metrics <- result$metrics
+```
+
+```{r}
+values_mat <- do.call(rbind, map(ts@series, ~ values(.)))
+reference_ae <- mean(abs(values_mat - mean(values_mat)))
+ggplot(metrics) +
+  geom_boxplot(aes(lag, mae)) +
+  geom_hline(yintercept = reference_ae)
 ```
 
 we can evaluate the overall training time

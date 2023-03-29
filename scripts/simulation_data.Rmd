@@ -22,10 +22,10 @@ set.seed(params$replicate)
 
 ```{r}
 fixed_parameters <- list(
-  n_perturb = 1, 
+  n_perturb = 1,
   n_covariates = 3, 
-  n_latent = 2, 
-  normalizer_A = 0.8, 
+  n_latent = 2,
+  normalizer_A = 0.8,
   normalizer_C = 0.8
 )
 

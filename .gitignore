@@ -10,3 +10,4 @@ scripts/.ipynb_checkpoints
 mdsine/inst/MDSINE2/build/
 mdsine/inst/MDSINE2/mdsine2.egg-info
 *DS_Store*
+*.rda
