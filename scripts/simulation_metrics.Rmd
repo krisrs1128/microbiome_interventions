@@ -5,8 +5,8 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  data: "tf_sim//sim_input_681.rda"
-  run_id: 1
+  data: "tf_sim//sim_input_768.rda"
+  run_id: 10
 ---
 
 ```{r setup, include=FALSE}
@@ -43,6 +43,13 @@ to use, and any ground truth needed in order to compute metrics.
 ```{r}
 load(params$data)
 hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
+
+interventions_df <- data.frame(interventions) |>
+  rownames_to_column("sample")
+metadata <- metadata |>
+  left_join(interventions_df) |>
+  rename(condition = P1)
+rownames(metadata) <- metadata$sample
 
 ts <- reads |>
   normalize(normalization, metadata) |>
@@ -82,16 +89,21 @@ time_diff <- Sys.time() - start
 Next, the hypothesis testing metrics.
 
 ```{r}
-lags <- mbtransfer:::time_lags(fit@parameters[[1]])
+lags <- time_lags(fit@parameters[[1]])
 n_interventions <- nrow(interventions(ts[[1]]))
 w <- counterfactual_interventions(lags[2], n_interventions)
-effects <- pd_splits(ts, w$w0, w$w1, 20, method = method, hyper = hyper)
+effects <- pd_splits(ts, w$w0, w$w1, 2, method = method, hyper = hyper)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r}
+ms0 <- ms
 ms <- ms |>
- mutate(truth = taxon %in% nonnull_taxa)
+ mutate(
+   truth = taxon %in% nonnull_taxa,
+   m = m + runif(n(), -0.05, 0.05)
+ )
+
 ms_ <- ms |>
   select(multisplit, m, lag) %>%
   split(.$lag) %>%

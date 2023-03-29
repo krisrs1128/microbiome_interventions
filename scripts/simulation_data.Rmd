@@ -97,6 +97,8 @@ for (i in seq_along(x)) {
 }
 
 reads <- do.call(cbind, x)
+reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
+
 colnames(reads) <- w_df |>
   filter(time > n_lag) |>
   pull(sample)
