@@ -15,7 +15,7 @@ tar -zxvf tf_sim.tar.gz
 # run the model configuration
 for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); do
   export RUN=$(printf %03d $i)
-  Rscript -e "rmarkdown::render('scripts/simulation_metrics.Rmd', params = list(data = 'tf_sim/sim_input_${RUN}.rda', run_id=${i}))"
+  Rscript -e "rmarkdown::render('scripts/simulation_metrics.Rmd', params = list(data = '../tf_sim/sim_input_${RUN}.rda', run_id=${i}))"
 done
 
 mkdir result-${process}
