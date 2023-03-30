@@ -26,18 +26,18 @@ fixed_parameters <- list(
   n_covariates = 3, 
   n_latent = 2,
   normalizer_A = 0.8,
-  normalizer_C = 0.8
+  normalizer_C = 0.8,
+  sparsity_A = 0.8,
+  n_lag = 4,
+  n_taxa = 250
 )
 
 varying_parameters <- expand.grid(
   n_subject = c(20, 40),
-  n_time = c(14, 30),
-  n_lag = c(2, 4),
-  n_taxa = c(100, 250),
+  n_time = c(20, 40),
   prop_nonnull = c(0.05, 0.2),
-  sparsity_A = c(0.2, 0.8),
   signal_B = c(0.5, 1, 2),
-  replicate = seq_len(4)
+  replicate = seq_len(3)
 ) |>
   mutate(output_path = glue("~/Downloads/sim_input_{str_pad(row_number(), 3, 'left', '0')}.rda"))
 
@@ -152,9 +152,9 @@ save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file 
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(768)) {
+for (i in seq_len(72)){
   if (i %% 10 == 0) {
-    print(glue("{i}/768"))
+    print(glue::glue("{i}/72"))
   }
   rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
 }

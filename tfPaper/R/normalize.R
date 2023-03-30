@@ -3,7 +3,7 @@
 #' @importFrom DESeq2 sizeFactors estimateSizeFactors
 #' @importFrom mbImpute mbImpute
 #' @export
-normalize <-  function(reads, method = "none",  metadata = NULL, ...) {
+normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   if (is.null(metadata)) {
     metadata <- data.frame(dummy = rep(1, nrow(reads)), sample = rownames(reads))
   }
