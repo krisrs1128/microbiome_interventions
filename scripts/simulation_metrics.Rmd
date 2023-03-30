@@ -6,14 +6,14 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 1
+  run_id: 5
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-```{r}
+```{r libraries}
 library(glue)
 library(fs)
 library(tidyverse)
@@ -22,20 +22,10 @@ library(tfPaper)
 set.seed(20230325)
 ```
 
-```{r}
-data_paths <- dir_ls(params$data_dir) |>
-  path_abs()
-
-configurations <- expand.grid(
-  method_hyper = c("mbtransfer-1", "mbtransfer-2", "mdsine"),
-  normalization = c("none", "DESeq2", "mbImpute"),
-  data_path = data_paths
-) |>
-  separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
-  mutate(
-    hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
-    output_path = glue("result-{str_pad(row_number(), 2, 'left', '0')}.rda")
-  )
+```{r configurations}
+configurations <- dir_ls(params$data_dir) |>
+  path_abs() |>
+  method_configurations()
 
 attach(as.list(configurations[params$run_id, ]))
 ```
@@ -45,7 +35,7 @@ It just runs on whatever data are available and computes metrics if possible.
 The main parameters are related to cross validation, the method to use, the data
 to use, and any ground truth needed in order to compute metrics.
 
-```{r}
+```{r ts-object}
 load(as.character(data_path))
 hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
 
@@ -54,7 +44,6 @@ interventions_df <- data.frame(interventions) |>
 metadata <- metadata |>
   left_join(interventions_df) |>
   rename(condition = P1)
-rownames(metadata) <- metadata$sample
 reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
 
 ts <- reads |>
@@ -65,7 +54,7 @@ ts <- reads |>
 
 First, the forecasting metrics.
 
-```{r}
+```{r cross_validation}
 tr_fun <- function(method, hyper = list()) {
   function(x) {
     train(x, method, hyper)
@@ -84,7 +73,7 @@ ggplot(metrics) +
 
 we can evaluate the overall training time
 
-```{r}
+```{r compute_time}
 start <- Sys.time()
 fit <- tr_fun(method, hyper)(ts)
 time_diff <- Sys.time() - start
@@ -92,7 +81,7 @@ time_diff <- Sys.time() - start
 
 Next, the hypothesis testing metrics.
 
-```{r}
+```{r multisplit_mirrors}
 lags <- time_lags(fit@parameters[[1]])
 n_interventions <- nrow(interventions(ts[[1]]))
 w <- counterfactual_interventions(lags[2], n_interventions)
@@ -100,7 +89,7 @@ effects <- pd_splits(ts, w$w0, w$w1, 20, method = method, hyper = hyper)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
-```{r}
+```{r false_discovery_estimates}
 ms <- ms |>
  mutate(
    truth = taxon %in% nonnull_taxa,
@@ -124,16 +113,10 @@ testing_results <- list(
 )
 ```
 
-```{r}
+```{r save_results}
 save(metrics, time_diff, testing_results, fit, file = output_path)
 ```
 
-```{r}
+```{r session}
 sessionInfo()
 ```
-
-
-```{r, eval = FALSE}
-Rscript -e "rmarkdown::render('simulation_metrics.Rmd', params = list(run_id = 2))"
-```
-
