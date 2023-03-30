@@ -125,10 +125,15 @@ testing_results <- list(
 ```
 
 ```{r}
-save(metrics, time_diff, testing_results, file = output_path)
+save(metrics, time_diff, testing_results, fit, file = output_path)
 ```
 
 ```{r}
 sessionInfo()
+```
+
+
+```{r, eval = FALSE}
+Rscript -e "rmarkdown::render('simulation_metrics.Rmd', params = list(run_id = 2))"
 ```
 

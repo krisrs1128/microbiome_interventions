@@ -77,46 +77,10 @@ values_df <- map_dfr(ts_, ~ bind_cols(rownames_to_column(data.frame(t(values(.))
 ```
 
 ```{r}
-subject_order <- function(values_df, taxa) {
-  values_wide <- values_df |>
-    filter(taxon %in% taxa) |>
-    select(subject, taxon, value, time) |>
-    mutate(time = round(time, -1)) |>
-    unite("txtime", taxon, time) |>
-    pivot_wider(names_from = txtime) |>
-    column_to_rownames("subject") |>
-    as.matrix()
-  
-  values_wide[is.na(values_wide)] <- 0
-  rownames(values_wide)[hclust(dist(values_wide))$order]
-}
-
-interaction_hm <- function(values_df, subject_data, taxa, condition) {
-  values_df |>
-    filter(taxon %in% taxa) |>
-    left_join(subject_data) |>
-    mutate(subject = factor(subject, subject_order(values_df, taxa))) |>
-    ggplot() +
-    geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
-    scale_x_continuous(expand = c(0, 0)) +
-    facet_grid(.data[[condition]] ~ reorder(taxon, -value), scales = "free", space = "free") +
-    scale_fill_distiller(direction = 1) +
-    scale_color_distiller(direction = 1) +
-    theme(
-      strip.text.y = element_text(angle = 0),
-      panel.grid = element_blank(),
-      panel.border = element_rect(linewidth = 1, fill = NA, color = "#545454"),
-      panel.spacing = unit(0, "cm")
-    )
-}
-```
-
-
-```{r}
 taxa <- c("L.gasseri", "Lactobacillus", "Gardnerella")
-interaction_hm(values_df, subject_data, taxa, "Race")
-interaction_hm(values_df, subject_data, taxa, "BirthControlYesNo")
-interaction_hm(values_df, subject_data, taxa, "bmi_cut")
+interaction_hm(values_df, subject_data, taxa, "Race", -1)
+interaction_hm(values_df, subject_data, taxa, "BirthControlYesNo", -1)
+interaction_hm(values_df, subject_data, taxa, "bmi_cut", -1)
 ```
 
 ```{r}

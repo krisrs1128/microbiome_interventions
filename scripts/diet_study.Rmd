@@ -9,7 +9,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(microTF)
+library(tfPaper)
+library(mbtransfer)
 library(tidyverse)
 library(fs)
 theme_set(theme_bw())
@@ -57,77 +58,100 @@ interventions <- samples |>
   ) |>
   select(Plant, Animal)
 
-subject_data <- NULL
+subject <- subject |>
+  rename(subject = subject_ID)
 samples <- samples |>
   rename(condition = intervention)
-
-save(samples, reads, interventions, subject_data, taxonomy, file = "data/diet_study.rda")
 ```
 
 ```{r}
-ts_inter <- ts_from_dfs(reads, interventions, samples, subject_data)
-values(ts_inter[[1]])
-interventions(ts_inter[[1]])
-ts_inter[[1]]@time
+ts <- ts_from_dfs(reads, interventions, samples, subject) |>
+  interpolate(method = "linear")
+
+values_df <- map_dfr(ts, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
+  pivot_longer(starts_with("Otu"), names_to = "taxon")
 ```
 
-```{r}
-ts <- interpolate(ts_inter)
+```{r, fig.height = 3, fig.width = 10}
+top_taxa <- values_df |>
+  group_by(taxon) |>
+  summarise(mean = mean(value)) |>
+  slice_max(mean, n = 7) |>
+  pull(taxon)
 
-i <- 6; j <- 10
-plot(ts[[i]]@time, values(ts[[i]])[j, ], col = "red")
-points(ts_inter[[i]]@time, values(ts_inter[[i]])[j, ])
+values_df |>
+  group_by(taxon) |>
+  mutate(value = rank(value)) |>
+  interaction_hm(subject, top_taxa, "diet")
 ```
 
 ### Cross Validation
 
-```{r, eval = FALSE}
-fit <- train(ts, method = "gbm")
-train_data <- patchify_df(ts, p = 1, q = 4)
-y_hat <- predict(fit@parameters[[1]], train_data$x)
-plot(train_data$y[[1]], y_hat)
-abline(a = 0, b = 1, col = "red")
+```{r}
+tr_fun <- 
+
+cross_validate(ts, tr_fun)
 ```
 
-```{r, eval = FALSE}
-new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2)
-y_hat <- gbm_predict_(fit@parameters, ts[1:2], new_interventions)
-plot(values(y_hat[[2]])[j, ])
-```
 
-### MDSINE
+### Interpretation
 
 ```{r}
-taxonomy <- read_tsv("md_data/taxonomy.tsv")
-hyper <- list(taxonomy = taxonomy[1:50, ])
-splits <- train_test_split(ts, 1 / 5)
-fit <- train(splits$train, "mdsine", hyper)
-```
+subject_data(ts) <- subject_data(ts) |>
+  mutate(diet = ifelse("Plant", 0, 1))
 
-```{r}
-t_start <- 4
-stest <- splits$test
-for (i in seq_along(stest)) {
-  values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE]
-}
-
-y_hat <- predict(fit, stest)
-```
-
-```{r}
-i <- 1
-plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ]))
-points(values(y_hat[[i]])[1, ], col = "red")
+train(ts, hyper = list(P = 2, Q = 2))
 ```
 
 
-```{r}
-tr_fun <- function(method, hyper = list()) {
-  function(x) {
-    train(x, method, hyper)
-  }
-}
 
-mdsine_result <- cross_validate(ts, tr_fun("mdsine", hyper))
-gbm_result <- cross_validate(ts, tr_fun("gbm"))
-```
+<!-- ```{r, eval = FALSE} -->
+<!-- fit <- train(ts, method = "gbm") -->
+<!-- train_data <- patchify_df(ts, p = 1, q = 4) -->
+<!-- y_hat <- predict(fit@parameters[[1]], train_data$x) -->
+<!-- plot(train_data$y[[1]], y_hat) -->
+<!-- abline(a = 0, b = 1, col = "red") -->
+<!-- ``` -->
+
+<!-- ```{r, eval = FALSE} -->
+<!-- new_interventions <- matrix(c(0, 0, 0, 1, 1, 0, 0, 0, 0, 0), nrow = 2) -->
+<!-- y_hat <- gbm_predict_(fit@parameters, ts[1:2], new_interventions) -->
+<!-- plot(values(y_hat[[2]])[j, ]) -->
+<!-- ``` -->
+
+<!-- ### MDSINE -->
+
+<!-- ```{r} -->
+<!-- taxonomy <- read_tsv("md_data/taxonomy.tsv") -->
+<!-- hyper <- list(taxonomy = taxonomy[1:50, ]) -->
+<!-- splits <- train_test_split(ts, 1 / 5) -->
+<!-- fit <- train(splits$train, "mdsine", hyper) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- t_start <- 4 -->
+<!-- stest <- splits$test -->
+<!-- for (i in seq_along(stest)) { -->
+<!--   values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_start), drop = FALSE] -->
+<!-- } -->
+
+<!-- y_hat <- predict(fit, stest) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- i <- 1 -->
+<!-- plot(values(splits$test[[i]])[1, ], ylim = range(values(y_hat[[i]])[1, ])) -->
+<!-- points(values(y_hat[[i]])[1, ], col = "red") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- tr_fun <- function(method, hyper = list()) { -->
+<!--   function(x) { -->
+<!--     train(x, method, hyper) -->
+<!--   } -->
+<!-- } -->
+
+<!-- mdsine_result <- cross_validate(ts, tr_fun("mdsine", hyper)) -->
+<!-- gbm_result <- cross_validate(ts, tr_fun("gbm")) -->
+<!-- ``` -->
