@@ -72,12 +72,6 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-# library(slider)
-# library(reticulate)
-# library(xgboost)
-# sapply(list.files("../mbtransfer/R/", full = T), source)
-# sapply(list.files("../tfPaper/R/", full = T), source)
-# sapply(list.files("../mdsine/R/", full = T), source)
 result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
 metrics <- result$metrics
 ```
