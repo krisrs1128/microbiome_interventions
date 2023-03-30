@@ -182,6 +182,7 @@ check_outputs <- function(data) {
 
 #' @importFrom tibble as_tibble
 #' @importFrom dplyr bind_rows
+#' @importFrom purrr reduce
 #' @export
 md_data <- function(ts_inter, taxonomy=NULL, qpcr=NULL, subject_names=NULL) {
   if (is.null(subject_names)) {
