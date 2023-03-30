@@ -108,9 +108,17 @@ time_lags <- function(fit) {
   c(P, Q)
 }
 
+pad_lag <- function(x, lag) {
+  if (ncol(x) < lag) {
+    x <- cbind(matrix(0, nrow(x), lag - ncol(x)), x)
+  }
+  x
+}
+
 #' @importFrom purrr set_names
 predictors <- function(ts_inter, w_next, lags, subject) {
-  x <- values(ts_inter)
+  x <- values(ts_inter) |>
+    pad_lag(lags[1])
   w <- interventions(ts_inter)
   x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
   w_prev <- cbind(w[, seq(ncol(w) - lags[2] + 2, ncol(w)), drop = FALSE], w_next)
