@@ -54,8 +54,8 @@ model_predict_single <- function(fit, ts_inter, new_interventions, lags, subject
 
 model_predict_step <- function(ts_inter, fit, z_next, lags, subject = NULL) {
   xz <- predictors(ts_inter, z_next, lags, subject)
-  n_inter <- length(intersect(fit[[1]]$feature_names, colnames(xz)))
   y_hat <- vector(length = nrow(ts_inter))
+
   for (j in seq_len(nrow(ts_inter))) {
     y_hat[j] <- predict(fit[[j]], xz)
   }

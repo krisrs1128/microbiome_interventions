@@ -10,7 +10,7 @@ patchify_single <- function(ts_inter, p = 2, q = 3) {
   k <- 1
   data <- replicate(3, list())
   names(data) <- c("x", "y", "w")
-  values_ <- values(ts_inter) 
+  values_ <- values(ts_inter)
   interventions_ <- interventions(ts_inter)
   
   # extract x (taxa), w (intervention), and y (future taxa) patches
@@ -119,7 +119,8 @@ pad_lag <- function(x, lag) {
 predictors <- function(ts_inter, w_next, lags, subject) {
   x <- values(ts_inter) |>
     pad_lag(lags[1])
-  w <- interventions(ts_inter)
+  w <- interventions(ts_inter) |>
+    pad_lag(lags[2])
   x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
   w_prev <- cbind(w[, seq(ncol(w) - lags[2] + 2, ncol(w)), drop = FALSE], w_next)
   
