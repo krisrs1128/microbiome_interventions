@@ -30,7 +30,9 @@ evaluation <- function(y, y_hat, test_ix) {
     residuals[[i]]<- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
     avg_err[[i]] <- data.frame(
       mse = mean(residuals[[i]] ^ 2),
-      mae = mean(abs(residuals[[i]]))
+      mae = mean(abs(residuals[[i]])),
+      mse_std = mse / var(residuals[[i]]),
+      mae_std = mean(abs(residuals[[i]])) / IQR(residuals[[i]])
     )
   }
   
@@ -61,7 +63,7 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
     }
     
     y_hat[[k]] <- predict(fits[[k]], stest)
-    for (h in seq(0, n_ahead)) {
+    for (h in seq_len(n_ahead)) {
       test_ix <- as.list(t_starts + h)
       metrics[[glue("{k}-{h}")]] <- evaluation(splits$test, y_hat[[k]], test_ix)
     }
