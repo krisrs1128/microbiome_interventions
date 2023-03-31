@@ -83,9 +83,11 @@ setMethod("times", "ts_inter_single", function(x) x@time)
 #' @export
 setGeneric("subject_data", function(x) standardGeneric("subject_data"))
 setMethod("subject_data", "ts_inter", function(x) x@subject_data)
-setGeneric("subject_data<-", function(x, subject_data) standardGeneric("subject_data<-"))
-setMethod("subject_data<-", "ts_inter", function(x, subject_data) {
-  x@subject_data <- subject_data
+
+#' @export
+setGeneric("subject_data<-", function(x, value) standardGeneric("subject_data<-"))
+setMethod("subject_data<-", "ts_inter", function(x, value) {
+  x@subject_data <- value
   x
 })
 

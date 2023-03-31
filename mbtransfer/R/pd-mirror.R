@@ -88,9 +88,9 @@ all_subsets <- function(set) {
 }
 
 #' @export
-counterfactual_interventions <- function(n_lag = 1, n_intervention = 1) {
+counterfactual_interventions <- function(n_lag = 1, n_interventions = 1) {
   indep_interventions <- list(w0 = list(), w1 = list())
-  for (k in seq_len(n_intervention)) {
+  for (k in seq_len(n_interventions)) {
     indep_interventions$w0[[k]] <- counterfactual_interventions_(n_lag, k)$w0
     indep_interventions$w1[[k]] <- counterfactual_interventions_(n_lag, k)$w1
   }
@@ -108,6 +108,7 @@ counterfactual_interventions <- function(n_lag = 1, n_intervention = 1) {
   map(result, ~ do.call(rbind, .))
 }
 
+#' @importFrom glue glue
 counterfactual_interventions_ <- function(n_lag = 1, k = 1) {
   w0 <- matrix(0, n_lag, n_lag)
   colnames(w0) <- glue("intervention{k}_lag{seq(0, n_lag - 1)}")
