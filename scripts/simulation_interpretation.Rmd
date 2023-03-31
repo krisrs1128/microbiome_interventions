@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(stringr)
 library(glue)
 library(fs)
 library(tidyverse)
@@ -22,32 +21,29 @@ library(tfPaper)
 ```
 
 ```{r}
-configurations <- expand.grid(
-  method_hyper = c("mbtransfer-1", "mbtransfer-2", "mdsine"),
-  normalization = c("none", "DESeq2", "relative_abundance", "mbImpute")
-) |>
-  separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
-  mutate(
-    hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
-    output_path = glue("result_{row_number()}.rda")
-  )
+data_var <- varying_parameters("~/Downloads") |>
+  mutate(data_path = factor(output_path)) |>
+  select(-output_path)
+configurations <- method_configurations(data_var$data_path) |>
+  left_join(data_var)
+```
+
+
+```{r}
+# paths <- dir_ls(params$outputs_dir) |>
+#   path_filter(regexp=params$outputs_filter)
+# 
+# metadata <- paths |>
+#   as_tibble() |>
+#   mutate(
+#     output_path = basename(value)
+#   ) |>
+#   left_join(configurations)
+# 
+# outputs <- map(paths, ~ get(load(.)))
 ```
 
 ```{r}
-paths <- dir_ls(params$outputs_dir) |>
-  path_filter(regexp=params$outputs_filter)
-
-metadata <- paths |>
-  as_tibble() |>
-  mutate(
-    output_path = basename(value)
-  ) |>
-  left_join(configurations)
-
-outputs <- map(paths, ~ get(load(.)))
-```
-
-```{r}
-computation <- map(outputs, .[["time_diff"]])
-metrics <- map_dfr(outputs, .[["metrics"]], .id = "value")
+# computation <- map(outputs, .[["time_diff"]])
+# metrics <- map_dfr(outputs, .[["metrics"]], .id = "value")
 ```

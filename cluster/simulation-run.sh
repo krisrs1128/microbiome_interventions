@@ -19,6 +19,7 @@ for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); d
 done
 
 mkdir result-${process}
-mv result*rda result-${process}
+mv scripts/result*rda result-${process}
+mv scripts/*html result-${process}
 tar -zcvf tf_sim_result-${process}.tar.gz result-${process}
 cp tf_sim_result*tar.gz /staging/ksankaran/microbiome_interventions/
