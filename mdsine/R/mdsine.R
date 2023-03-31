@@ -15,9 +15,9 @@ install_mdsine <- function(envname = "mdsine") {
     filter(name == envname) |>
     pull(python)
   md_dir <- path(tempdir())
-  download.file("https://github.com/gerberlab/MDSINE2/archive/fac880c8c096464cd9a80e72b930cfcf3bd88f21.zip", md_dir / "mdsine2.zip")
+  download.file("https://github.com/krisrs1128/MDSINE2/archive/refs/heads/master.zip", md_dir / "mdsine2.zip")
   unzip(md_dir / "mdsine2.zip")
-  system(glue("{path} -m pip install MDSINE2-fac880c8c096464cd9a80e72b930cfcf3bd88f21/"))
+  system(glue("{path} -m pip install MDSINE2-master/"))
 }
 
 #' @importFrom fs path
