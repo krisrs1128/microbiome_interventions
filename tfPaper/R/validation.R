@@ -31,8 +31,8 @@ evaluation <- function(y, y_hat, test_ix) {
     avg_err[[i]] <- data.frame(
       mse = mean(residuals[[i]] ^ 2),
       mae = mean(abs(residuals[[i]])),
-      mse_std = mean(residuals[[i]] ^ 2) / var(residuals[[i]]),
-      mae_std = mean(abs(residuals[[i]])) / IQR(residuals[[i]])
+      mse_std = mean(residuals[[i]] ^ 2) / var(as.numeric(values(y[[i]][, -test_ix[[i]]]))),
+      mae_std = mean(abs(residuals[[i]])) / IQR(as.numeric(values(y[[i]][, -test_ix[[i]]])))
     )
   }
   
