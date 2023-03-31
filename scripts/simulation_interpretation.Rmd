@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 params:
   outputs_dir: "~/Downloads"
-  outputs_filter: "result*"
+  outputs_filter: "*rda"
 date: "`r Sys.Date()`"
 ---
 
@@ -18,6 +18,7 @@ library(glue)
 library(fs)
 library(tidyverse)
 library(tfPaper)
+theme_set(my_theme())
 ```
 
 ```{r}
@@ -28,22 +29,51 @@ configurations <- method_configurations(data_var$data_path) |>
   left_join(data_var)
 ```
 
+```{r}
+configurations[c(5,6, 11, 12), ]
+```
+
+It looks like configurations 5/6 and 11/12 have failed. Why? These are all the
+MDSINE runs that we had launched. Can we reproduce this locally? My
+understanding was that the new (always nonnegative) normalization should allow
+the model to fit well. But perhaps we need to round?
+
+The timing of the failures suggests that it was running the most recent versions
+of the code.
 
 ```{r}
-# paths <- dir_ls(params$outputs_dir) |>
-#   path_filter(regexp=params$outputs_filter)
-# 
-# metadata <- paths |>
-#   as_tibble() |>
-#   mutate(
-#     output_path = basename(value)
-#   ) |>
-#   left_join(configurations)
-# 
-# outputs <- map(paths, ~ get(load(.)))
+paths <- dir_ls(params$outputs_dir, recurse = TRUE) |>
+  path_filter(regexp=params$outputs_filter)
+
+metadata <- paths |>
+  as_tibble() |>
+  mutate(
+    output_path = basename(value)
+  ) |>
+  rename(full_path = value) |>
+  left_join(configurations)
 ```
 
 ```{r}
-# computation <- map(outputs, .[["time_diff"]])
-# metrics <- map_dfr(outputs, .[["metrics"]], .id = "value")
+metrics <- map_dfr(paths, ~ { load(.); metrics }, .id = "full_path")
+computation <- map_dfr(paths, ~ { load(.); tibble(time_diff = time_diff) }, .id = "full_path")
+```
+
+```{r}
+computation |>
+  left_join(metadata) |>
+  ggplot() +
+  geom_point(aes(normalization, time_diff, col = as.factor(n_subject)))
+```
+
+```{r}
+metrics <- metrics |>
+  select(full_path, starts_with("mae")) |>
+  left_join(metadata) |>
+  unnest_wider("hyper")
+
+ggplot(metrics) +
+  geom_boxplot(aes(interaction(n_subject, n_time), mae, fill = as.factor(P))) +
+  facet_wrap( ~ normalization) +
+  scale_y_sqrt()
 ```
