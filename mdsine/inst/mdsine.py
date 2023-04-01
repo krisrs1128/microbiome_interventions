@@ -4,6 +4,7 @@ from mdsine2.names import STRNAMES
 
 def set_params(model="NegBin", **kwargs):
   params = {"seed": 0, "burnin": 10, "n_samples": 100, "checkpoint": 25, "basepath": "."}
+  #params = {"seed": 0, "burnin": 2, "n_samples": 10, "checkpoint": 5, "basepath": "."}
   params.update(**kwargs)
 
   if model == "NegBin":
@@ -46,6 +47,11 @@ def mdsine(dataset, **kwargs):
 
 def forward_simulate(fit, x0, perturbations=None, starts=None, ends=None, 
                      dt=0.25, n_days=3):
+  if (isinstance(starts, float)):
+    starts = [starts]
+  if (isinstance(ends, float)):
+    ends = [ends]
+
   growth = md2.summary(fit.graph[STRNAMES.GROWTH_VALUE])["mean"]
   interactions = md2.summary(fit.graph[STRNAMES.INTERACTIONS_OBJ])["mean"]
   dyn = md2.model.gLVDynamicsSingleClustering(
