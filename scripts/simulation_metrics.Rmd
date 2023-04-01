@@ -18,6 +18,7 @@ library(glue)
 library(fs)
 library(tidyverse)
 library(mbtransfer)
+library(mdsine)
 library(tfPaper)
 set.seed(20230325)
 ```
@@ -57,7 +58,11 @@ First, the forecasting metrics.
 ```{r cross_validation}
 tr_fun <- function(method, hyper = list()) {
   function(x) {
-    train(x, method, hyper)
+    if (method == "mdsine") {
+      mdsine(ts, hyper$taxonomy)
+    } else if (method == "mbtransfer") {
+      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
+    }
   }
 }
 
@@ -67,8 +72,7 @@ metrics <- result$metrics
 
 ```{r}
 ggplot(metrics) +
-  geom_boxplot(aes(lag, mae)) +
-  scale_y_log10()
+  geom_boxplot(aes(lag, mae))
 ```
 
 we can evaluate the overall training time

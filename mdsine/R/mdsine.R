@@ -2,7 +2,8 @@
 #' @export
 mdsine <- function(ts_inter, taxonomy) {
   data <- md_data(ts_inter, taxonomy)
-  do.call(mdsine_, data)
+  fit <- do.call(mdsine_, data)
+  new("mdsine_model", parameters = fit, method = "mdsine", hyper = list(taxonomy = taxonomy))
 }
 
 #' @importFrom reticulate conda_create conda_list
@@ -244,3 +245,14 @@ add_names <- function(ts_inter) {
   result
 }
 
+setClass(
+  "mdsine_model",
+  slots = c(
+    parameters = "ANY",
+    method = "character",
+    hyper = "list"
+  )
+)
+
+#' @export
+setMethod("predict",  c(object = "mdsine_model"), forward_simulate)
