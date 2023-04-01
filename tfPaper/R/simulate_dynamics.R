@@ -18,6 +18,14 @@ matunif <- function(N, M, lower = -1, upper = 1) {
   matrix(runif(N * M, lower, upper), N, M)
 }
 
+#' @export
+matunifband <- function(N, M, lower = .5, upper = 1) {
+  x <- matrix(runif(N * M, lower, upper), N, M)
+  z <- matrix(sample(c(1, -1), N * M, replace = TRUE), N, M)
+  x * z
+}
+
+
 #' @importFrom MCMCpack rdirichlet
 factorized_step <- function(J, K, D = NULL, ...) {
   if (is.null(D)) {
@@ -25,7 +33,7 @@ factorized_step <- function(J, K, D = NULL, ...) {
   }
   
   Theta <- matunif(J, K, ...)
-  B <- matunif(K, D, ...)
+  B <- matunifband(K, D, ...)
   list(B = B, Theta = Theta)
 }
 
@@ -98,12 +106,21 @@ low_rank_step_ <- function(n_taxa, n_latent, n_perturb, n_lag) {
 }
 
 #' @export
+random_step <- function(n_taxa, n_perturb, n_lag, lower = .1, upper = 1) {
+  result <- list()
+  for (l in seq_len(n_lag)) {
+    result[[l]] <- matunifband(n_taxa, n_perturb, lower, upper)
+  }
+  result
+}
+
+#' @export
 random_interventions <- function(n_perturb, n_time, n_lag = 3) {
   w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
   for (i in seq_along(w)) {
     for (j in seq_len(n_perturb)) {
       start_ix <- sample((n_time / 3) : (n_time - n_lag), 1)
-      end_ix <- start_ix + sample((n_lag / 2) : (2 * n_lag), 1)
+      end_ix <- start_ix + sample((0.5 * n_lag) : (1.5 * n_lag), 1)
       w[[i]][j, start_ix:min(n_time, end_ix)] <- 1
     }
   }

@@ -20,12 +20,13 @@ method_configurations <- function(data_paths) {
 #' @importFrom dplyr mutate
 #' @importFrom glue glue
 #' @export
-varying_parameters <- function(output_root="~/Downloads/") {
+data_parameters <- function(output_root="~/Downloads/") {
   expand.grid(
-    n_subject = c(20, 40),
-    n_time = c(20, 40),
-    prop_nonnull = c(0.05, 0.2),
+    n_subject = 50,
+    n_time = 30,
+    prop_nonnull = c(0.15, 0.3),
     signal_B = c(0.5, 1, 2),
+    n_taxa = c(50, 100),
     replicate = seq_len(3)
   ) |>
     mutate(output_path = glue("{output_root}/sim_input_{str_pad(row_number(), 3, 'left', '0')}.rda"))
@@ -36,12 +37,10 @@ fixed_parameters <- function() {
   list(
     n_perturb = 1,
     n_covariates = 3, 
-    n_latent = 2,
-    normalizer_A = 0.8,
-    normalizer_C = 0.8,
+    n_latent = 4,
+    normalizer_A = 0.5,
+    normalizer_C = 0.2,
     sparsity_A = 0.8,
-    n_lag = 4,
-    n_taxa = 250
+    n_lag = 3
   )
 }
-
