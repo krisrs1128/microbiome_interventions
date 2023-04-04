@@ -27,94 +27,48 @@ consistency_mirror_multisplit <- function(effects) {
   bind_rows(ms)
 }
 
+#' Mirror Splits from Partial Dependence
+#'
+#' For ech split, we return an array of dimension n_taxa x 2 fits x n_lags. Each
+#' entry contains the estimated counterfactual effect for that taxon and lag
+#' combination across the two models (each fit on a different random sample of
+#' data).
+#'
 #' @export
-pd_generator <- function(ts, lags) {
-  x <- patchify_df(ts, lags[1], lags[2])$x
-  
-  function(fit, partial_x) {
-    pnames <- intersect(colnames(partial_x), colnames(x))
-    nx <- nrow(partial_x)
-    y_hat <- matrix(nrow = length(fit), ncol = nx)
-
-    for (j in seq_along(fit)) {
-      x_ <- x
- 
-      for (i in seq_len(nx)) {
-        x_[, pnames] <- partial_x[i, ]
-        y_hat[j, i] <- mean(predict(fit[[j]], x_))
-      }
-    }
-    
-    y_hat
-  }
-}
-
-#' @export
-pd_effects <- function(pd, fit, w0, w1) {
-  pd(fit, w1) - pd(fit, w0)
-}
-
-#' @export
-pd_splits <- function(ts, w0, w1, n_splits, method = "mbtransfer", ...) {
-  effects <- replicate(n_splits, array(dim = c(nrow(ts[[1]]), 2, nrow(w0))), simplify = FALSE)
+pd_splits <- function(ts, w0, w1, n_splits, tr_fun, ...) {
+  effects <- replicate(n_splits, array(dim = c(nrow(ts[[1]]), 2, ncol(w0))), simplify = FALSE)
 
   for (s in seq_len(n_splits)) {
-    print(str_c("Evaluating split ", s))
+    print(glue("Evaluating split {s}"))
     split_ix <- sample(length(ts), 0.5 * length(ts))
-    fits <- list(
-      train(ts[split_ix], method = method, ...)@parameters,
-      train(ts[-split_ix], method = method, ...)@parameters
-    )
+    ts_split <- list(ts[split_ix], ts[-split_ix])
+    fits <- map(ts_split, tr_fun)
 
-    lags <- time_lags(fits[[1]][[1]])
-    pd_fun <- list(
-      pd_generator(ts[split_ix], lags),
-      pd_generator(ts[-split_ix], lags)
-    )
-    
-    for (i in seq_along(fits)) {
-      effects[[s]][,i,] <- pd_effects(pd_fun[[i]], fits[[i]], w0, w1)
+    for (i in seq_along(ts_split)) {
+      effects[[s]][, i,] <- pd_effects(fits[[i]], ts_split[[i]], w0, w1, ...)
     }
   }
-  
+
   effects
 }
 
-# https://stackoverflow.com/questions/18715580/algorithm-to-calculate-power-set-all-possible-subsets-of-a-set-in-r
-all_subsets <- function(set) { 
-  n <- length(set)
-  masks <- 2^(1:n-1)
-  lapply(1:2^n-1, function(u) set[ bitwAnd(u, masks) != 0 ])
+pd_summary <- function(y0, y1, ix, summary_fun = mean) {
+  map((y0 - y1)[, ix], ~ values(.)) |>
+    abind(along = 3) |>
+    apply(1:2, summary_fun)
 }
 
-#' @export
-counterfactual_interventions <- function(n_lag = 1, n_interventions = 1) {
-  indep_interventions <- list(w0 = list(), w1 = list())
-  for (k in seq_len(n_interventions)) {
-    indep_interventions$w0[[k]] <- counterfactual_interventions_(n_lag, k)$w0
-    indep_interventions$w1[[k]] <- counterfactual_interventions_(n_lag, k)$w1
+pd_effects <- function(fit, ts, w0, w1, n_sample = NULL, patch_len = 8) {
+  if (is.null(n_sample)) {
+    n_sample <- 0.2 * length(ts) * ncol(ts[[1]])
   }
-  
-  result <- list(w0 = list(), w1 = list())
-  S <- all_subsets(seq_len(n_interventions))[-1]
-  for (i in seq_along(S)) {
-    ix <- S[[i]]
-    result$w0[[i]] <- do.call(cbind, indep_interventions$w0)
-    tmp <- c(indep_interventions$w0[-ix], indep_interventions$w1[ix])
-    tmp <- do.call(cbind, tmp)
-    result$w1[[i]] <- tmp[, order(colnames(tmp))]
-  }
-  
-  map(result, ~ do.call(rbind, .))
-}
 
-#' @importFrom glue glue
-counterfactual_interventions_ <- function(n_lag = 1, k = 1) {
-  w0 <- matrix(0, n_lag, n_lag)
-  colnames(w0) <- glue("intervention{k}_lag{seq(0, n_lag - 1)}")
-  w1 <- w0
-  for (i in seq_len(n_lag)) {
-    w1[i, ] <- c(rep(1, i), rep(0, n_lag - i))
-  }
-  list(w0 = w0, w1 = w1)
+  # sampled patches under two counterfactual interventions
+  ts_star <- sample_ts(ts, n_sample, patch_len) |>
+    counterfactual_ts(w0, w1)
+
+  # compute difference in predictions across future ix
+  y_hats <- map(ts_star, ~ predict(fit, .))
+  ix <- seq(patch_len + 1, patch_len + ncol(w0))
+  pd_summary(y_hats[[1]], y_hats[[2]], ix)
 }
