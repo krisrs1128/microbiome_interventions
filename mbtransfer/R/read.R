@@ -33,3 +33,20 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   
   new("ts_inter", series = series, subject_data = subject_data)
 }
+
+ts_to_dfs <- function(ts) {
+  reads <- do.call(cbind, map(ts, ~ values(.)))
+  interventions <- do.call(cbind, map(ts, ~ interventions(.)))
+  metadata <- map_dfr(ts, ~ tibble(sample = colnames(values(.)), time = .@time), .id = "subject")
+  if (!is.null(names(ts))) {
+    metadata <- metadata |>
+      mutate(subject = names(ts)[as.integer(subject)])
+  }
+  
+  list(
+    reads = reads,
+    interventions = interventions,
+    metadata = metadata,
+    subject_data = subject_data(ts)
+  )
+}
