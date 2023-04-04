@@ -37,6 +37,15 @@ mdsine_ <- function(taxonomy, reads, qpcr, metadata, perturbations, envname = "m
   py$mdsine(dataset, ...)
 }
 
+#' @export
+split_future <- function(series_i) {
+  t1 <- ncol(series_i)
+  t2 <- ncol(interventions(series_i))
+  pre <- series_i[, seq_len(t1), drop = FALSE]
+  interventions <- interventions(series_i)[, seq(t1 + 1, t2), drop = FALSE]
+  list(pre = pre, interventions = interventions)
+}
+
 #' @importClassesFrom mbtransfer ts_inter
 #' @export
 forward_simulate <- function(object, newdata, dt=0.25) {
