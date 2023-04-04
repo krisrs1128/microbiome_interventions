@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 3
+  run_id: 1
 ---
 
 ```{r setup, include=FALSE}
@@ -86,18 +86,22 @@ time_diff <- Sys.time() - start
 Next, the hypothesis testing metrics.
 
 ```{r multisplit_mirrors}
-lags <- time_lags(fit@parameters[[1]])
-n_interventions <- nrow(interventions(ts[[1]]))
-w <- counterfactual_interventions(lags[2], n_interventions)
-effects <- pd_splits(ts, w$w0, w$w1, 20, method = method, hyper = hyper)
+if (method == "mbtransfer") {
+  lags <- time_lags(fit@parameters[[1]])
+} else {
+  lags <- c(1, 1)
+}
+
+ws <- steps(c("P1" = TRUE), L = 3)
+effects <- pd_splits(ts, ws[[1]], ws[[3]], 3, tr_fun("mbtransfer", hyper))
 ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r false_discovery_estimates}
 ms <- ms |>
  mutate(
-   truth = taxon %in% nonnull_taxa,
-   m = m + runif(n(), -0.05, 0.05)
+   truth = taxon %in% nonnull_taxa
+#   m = m + runif(n(), -0.0001, 0.0001)
  )
 
 ms_ <- ms |>
