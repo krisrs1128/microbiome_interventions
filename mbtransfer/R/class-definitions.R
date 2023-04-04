@@ -102,7 +102,6 @@ setMethod("subject_data<-", "ts_inter", function(x, value) {
   x
 })
 
-
 #' @export
 setMethod("names", "ts_inter", function(x) names(x@series))
 

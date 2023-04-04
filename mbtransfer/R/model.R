@@ -13,64 +13,38 @@ mbtransfer <- function(ts_inter, P = 1, Q = 1, verbose = 0, nrounds = 25, object
 }
 
 #' @export
-split_future <- function(series_i) {
-  t1 <- ncol(series_i)
-  t2 <- ncol(interventions(series_i))
-  pre <- series_i[, seq_len(t1), drop = FALSE]
-  interventions <- interventions(series_i)[, seq(t1 + 1, t2), drop = FALSE]
-  list(pre = pre, interventions = interventions)
-}
-
-#' @export
 mbtransfer_predict <- function(object, newdata) {
-  fit <- object@parameters
-  series <- list()
-  new_interventions <- list()
-
-  for (i in seq_along(newdata)) {
-    split_data <- split_future(newdata[[i]])
-    series[[i]] <- split_data$pre
-    new_interventions[[i]] <- split_data$interventions
-  }
-
-  newdata <- new("ts_inter", series = series, subject_data = subject_data(newdata))
-  mbtransfer_predict_(fit, newdata, new_interventions)
-}
-
-#' @export
-mbtransfer_predict_ <- function(fit, ts_inter, new_interventions) {
-  lags <- time_lags(fit[[1]])
-  if (!is.list(new_interventions)) {
-    new_interventions <- replicate(length(ts_inter), new_interventions, simplify = FALSE)
-  }
-
+  lags <- time_lags(object@parameters[[1]])
   result <- list()
-  subject <- subject_data(ts_inter) |>
+  subject <- subject_data(newdata) |>
     select(-subject) |>
     as.matrix()
   
-  for (i in seq_along(ts_inter)) {
+  for (i in seq_along(newdata)) {
     result[[i]] <- model_predict_single(
-      fit, 
-      ts_inter[[i]],
-      new_interventions[[i]], 
+      object@parameters, 
+      newdata[[i]],
       lags, 
       subject[i,, drop = FALSE]
     )
   }
 
-  new("ts_inter", series = result)
+  new("ts_inter", series = result, subject_data = subject_data(newdata))
 }
 
-model_predict_single <- function(fit, ts_inter, new_interventions, lags, subject = NULL) {
-  for (h in seq_len(ncol(new_interventions))) {
-    ts_inter <- model_predict_step(ts_inter, fit, new_interventions[, h, drop = FALSE], lags, subject)
+model_predict_single <- function(fit, ts_inter, lags, subject = NULL) {
+  n_time <- ncol(ts_inter)
+  w <- interventions(ts_inter)
+  while(ncol(ts_inter) < ncol(w)) {
+    ts_inter <- model_predict_step(ts_inter, fit, lags, subject)
   }
+
+  colnames(values(ts_inter)) <- colnames(w)
   ts_inter
 }
 
-model_predict_step <- function(ts_inter, fit, z_next, lags, subject = NULL) {
-  xz <- predictors(ts_inter, z_next, lags, subject)
+model_predict_step <- function(ts_inter, fit, lags, subject = NULL) {
+  xz <- predictors(ts_inter, lags, subject)
   y_hat <- vector(length = nrow(ts_inter))
 
   for (j in seq_len(nrow(ts_inter))) {
@@ -79,10 +53,10 @@ model_predict_step <- function(ts_inter, fit, z_next, lags, subject = NULL) {
 
   values(ts_inter) <- cbind(values(ts_inter), y_hat)
   ts_inter@time <- c(ts_inter@time, max(ts_inter@time) + 1)
-  interventions(ts_inter) <- cbind(interventions(ts_inter), z_next)
   ts_inter
 }
 
+#' @export
 setClass(
   "mbtransfer_model",
   slots = c(
