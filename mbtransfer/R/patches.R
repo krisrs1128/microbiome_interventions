@@ -115,14 +115,18 @@ pad_lag <- function(x, lag) {
   x
 }
 
+#' Generate a Predictor Matrix
+#' 
 #' @importFrom purrr set_names
-predictors <- function(ts_inter, w_next, lags, subject) {
+predictors <- function(ts_inter, lags, subject) {
   x <- values(ts_inter) |>
     pad_lag(lags[1])
   w <- interventions(ts_inter) |>
     pad_lag(lags[2])
-  x_prev <- x[, seq(ncol(x) - lags[1] + 1, ncol(x)), drop = FALSE]
-  w_prev <- cbind(w[, seq(ncol(w) - lags[2] + 2, ncol(w)), drop = FALSE], w_next)
+  n_time <- ncol(x)
+  
+  x_prev <- x[, seq(n_time - lags[1] + 1, by = 1, length.out = lags[1]), drop = FALSE]
+  w_prev <- w[, seq(n_time - lags[2] + 2, by = 1, length.out = lags[2]), drop = FALSE]
   
   xw <- cbind(matrix(x_prev, nrow = 1), matrix(w_prev, nrow = 1)) |>
     as.data.frame() |>

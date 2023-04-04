@@ -3,7 +3,7 @@
 #' @export
 replace_inter_ <- function(ts, new_inter, start_ix = NULL) {
   if (is.null(start_ix)) {
-    start_ix <- ncol(ts) - ncol(new_inter) + 1
+    start_ix <- ncol(ts)
   }
 
   inter <- interventions(ts)[, seq_len(start_ix), drop = FALSE]
@@ -18,7 +18,9 @@ replace_inter <- function(ts, new_inter, start_ix = NULL) {
   }
   
   for (i in seq_along(ts)) {
-    ts[[i]] <- replace_inter_(ts[[i]], new_inter, start_ix)
+    inter_ <- new_inter
+    colnames(inter_) <- str_c(names(ts)[i], colnames(inter_))
+    ts[[i]] <- replace_inter_(ts[[i]], inter_, start_ix[i])
   }
   
   ts
@@ -33,6 +35,7 @@ replace_subject <- function(ts, new_subject) {
   ts
 }
 
+#' @export
 sample_ts <- function(ts, n, patch_len = 5) {
   # randomly subset series
   weights <- map_dbl(ts, ncol)
@@ -48,3 +51,13 @@ sample_ts <- function(ts, n, patch_len = 5) {
   
   ts_star
 }
+
+diff_ts_inter <- function(e1, e2) {
+  result <- e1
+  for (i in seq_along(e1)) {
+    values(result[[i]]) <- values(e1[[i]]) - values(e2[[i]])
+  }
+  result
+}
+
+setMethod("-", c("ts_inter", "ts_inter"), diff_ts_inter)
