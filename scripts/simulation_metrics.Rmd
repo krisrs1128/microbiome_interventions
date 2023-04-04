@@ -92,33 +92,30 @@ if (method == "mbtransfer") {
   lags <- c(1, 1)
 }
 
-ws <- steps(c("P1" = TRUE), L = 3)
-effects <- pd_splits(ts, ws[[1]], ws[[3]], 3, tr_fun("mbtransfer", hyper))
+ws <- steps(c("P1" = TRUE), L = 1)
+effects <- pd_splits(ts, ws[[1]], ws[[3]], 2, tr_fun("mbtransfer", hyper), n_sample = 10)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r false_discovery_estimates}
-ms <- ms |>
- mutate(
-   truth = taxon %in% nonnull_taxa
-#   m = m + runif(n(), -0.0001, 0.0001)
- )
-
 ms_ <- ms |>
   select(multisplit, m, lag) %>%
   split(.$lag) %>%
   map(~ split(., .$multisplit) %>% map(~ pull(., m)))
 
-# we should have a version with different nonnull taxa per lag
-lag <- 1
-R <- str_c("tax", which(multiple_data_splitting(ms_[[lag]])))
-S <- intersect(str_c("tax", nonnull_taxa),  R)
-V <- setdiff(R, str_c("tax", nonnull_taxa))
+testing_results <- list()
+for (l in seq_len(max(lags))) {
+  R <- str_c("tax", which(multiple_data_splitting(ms_[[l]])))
+  S <- intersect(str_c("tax", nonnull_taxa[[l]]),  R)
+  V <- setdiff(R, str_c("tax", nonnull_taxa[[l]]))
 
-testing_results <- list(
-  fdp = length(V) / length(R),
-  power = length(S) / length(nonnull_taxa)
-)
+  testing_results[[l]] <- list(
+    R = R,
+    truth = nonnull_taxa[[l]],
+    fdp = length(V) / max(length(R), 1),
+    power = length(S) / length(nonnull_taxa[[lag]])
+  )
+}
 ```
 
 ```{r save_results}

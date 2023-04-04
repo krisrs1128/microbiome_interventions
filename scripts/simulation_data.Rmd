@@ -23,7 +23,7 @@ set.seed(params$replicate)
 ```{r}
 attach(fixed_parameters())
 attach(as.list(data_parameters()[params$run, ]))
-nonnull_taxa <- seq(n_taxa * prop_nonnull)
+nonnull_taxa <- list(seq(n_taxa * prop_nonnull))
 ```
 
 This generates the coefficient matrices for dynamics, perturbations, and
@@ -34,9 +34,20 @@ A <- low_rank_step(n_taxa, n_latent, n_taxa, n_lag) |>
  sparsify(sparsity_A) |>
  normalize_mat(normalizer_A)
 B <- random_step(n_taxa, n_perturb, n_lag, lower = signal_B, upper = 2 * signal_B) |>
-  sparsify_rows(nonnull_taxa)
+  sparsify_rows(nonnull_taxa[[1]])
 C <- low_rank_step_(n_taxa, n_latent, n_perturb, n_lag) |>
   map(~ sparsify(.) |> normalize_mat(normalizer_C))
+```
+
+The definition of which taxa are null varies depending on the lag of the
+intervention. An immediate effect on species $i$ may propagate to a lagged-term
+effect on species $j$ if there is a nonzero entry in $A_{ij}$.
+
+```{r}
+for (i in seq(2, n_lag)) {
+  e <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]
+  nonnull_taxa[[i]] <- which((A[[i - 1]] %*% ifelse(e, 1, 0)) != 0)
+}
 ```
 
 Now we can simulate one example series.
