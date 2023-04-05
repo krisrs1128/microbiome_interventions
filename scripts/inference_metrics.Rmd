@@ -6,7 +6,8 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 3
+  run_id: 1
+  qvalue: 0.2
 ---
 
 ```{r setup, include=FALSE}
@@ -16,9 +17,10 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```{r libraries}
 library(glue)
 library(fs)
+library(DESeq2)
+library(phyloseq)
 library(tidyverse)
 library(mbtransfer)
-library(mdsine)
 library(tfPaper)
 set.seed(20230325)
 ```
@@ -26,7 +28,9 @@ set.seed(20230325)
 ```{r configurations}
 configurations <- dir_ls(params$data_dir) |>
   path_abs() |>
-  method_configurations()
+  method_configurations() |>
+  filter(map_lgl(hyper, ~ !is.null(.$P) > 0 && .$P == 2)) |>
+  mutate(output_path = glue("inference-{str_pad(row_number(), 3, 'left', '0')}.rda"))
 
 attach(as.list(configurations[params$run_id, ]))
 ```
@@ -38,14 +42,12 @@ to use, and any ground truth needed in order to compute metrics.
 
 ```{r ts-object}
 load(as.character(data_path))
-hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
 
 interventions_df <- data.frame(interventions) |>
   rownames_to_column("sample")
 metadata <- metadata |>
   left_join(interventions_df) |>
   rename(condition = P1)
-reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
 
 ts <- reads |>
   normalize(normalization, metadata) |>
@@ -53,73 +55,62 @@ ts <- reads |>
   interpolate()
 ```
 
-First, the forecasting metrics.
+### DESeq2
 
-```{r cross_validation}
-tr_fun <- function(method, hyper = list()) {
-  function(x) {
-    if (method == "mdsine") {
-      mdsine(ts, hyper$taxonomy)
-    } else if (method == "mbtransfer") {
-      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
-    }
-  }
-}
+```{r run_deseq2}
+samples <- metadata |>
+  left_join(subject_data) |>
+  column_to_rownames("sample") |>
+  sample_data()
 
-result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
-metrics <- result$metrics
+dds <- phyloseq(otu_table(reads, taxa_are_rows = FALSE), samples) |>
+  phyloseq_to_deseq2(~ condition * V1) |>
+  DESeq(sfType = "poscounts")
 ```
 
-```{r}
-#ggplot(metrics) +
-#  geom_boxplot(aes(lag, mae))
+```{r, deseq_postprocessing}
+R_deseq <- results(dds, name = "condition") |>
+    data.frame() |>
+    rownames_to_column("taxon") |>
+    filter(padj < params$qvalue) |>
+    mutate(taxon = as.integer(str_remove(taxon, "tax"))) |>
+    pull(taxon)
+
+lags <- unlist(hyper[[1]])
+R_deseq <- replicate(max(lags), R_deseq, simplify = FALSE)
 ```
 
-we can evaluate the overall training time
-
-```{r compute_time}
-start <- Sys.time()
-fit <- tr_fun(method, hyper)(ts)
-time_diff <- Sys.time() - start
-```
-
-Next, the hypothesis testing metrics.
+### Mirror-based testing
 
 ```{r multisplit_mirrors}
-if (method == "mbtransfer") {
-  lags <- time_lags(fit@parameters[[1]])
-} else {
-  lags <- c(5, 5)
+ws <- steps(c("P1" = TRUE), L = max(lags))
+tr_fun <- function(x) {
+  mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q)
 }
 
-ws <- steps(c("P1" = TRUE), L = max(lags))
-effects <- pd_splits(ts, ws[[1]], ws[[2]], 2, tr_fun(method, hyper), n_sample = 10)
+effects <- pd_splits(ts, ws[[1]], ws[[2]], 3, tr_fun, n_sample = 10)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
 ```{r false_discovery_estimates}
-ms_ <- ms |>
+R_mirror <- ms |>
   select(multisplit, m, lag) %>%
   split(.$lag) %>%
-  map(~ split(., .$multisplit) %>% map(~ pull(., m)))
+  map(~ split(., .$multisplit) %>% map(~ pull(., m))) |>
+  map(~ which(multiple_data_splitting(., q = params$qvalue)))
+```
 
+### Combining results
+
+```{r combined_results}
 testing_results <- list()
-for (l in seq_len(max(lags))) {
-  R <- str_c("tax", which(multiple_data_splitting(ms_[[l]])))
-  S <- intersect(str_c("tax", nonnull_taxa[[l]]),  R)
-  V <- setdiff(R, str_c("tax", nonnull_taxa[[l]]))
-
-  testing_results[[l]] <- list(
-    R = R,
-    truth = nonnull_taxa[[l]],
-    fdp = length(V) / max(length(R), 1),
-    power = length(S) / length(nonnull_taxa[[l]])
-  )
-}
+testing_results$DESeq2 <- lagged_testing_metrics(R_deseq, nonnull_taxa)
+testing_results$mirror <- lagged_testing_metrics(R_mirror, nonnull_taxa)
+testing_results <- bind_rows(testing_results, .id = "method")
 ```
 
 ```{r save_results}
-save(metrics, time_diff, testing_results, fit, file = output_path)
+save(testing_results, fit, ms, file = output_path)
 ```
 
 ```{r session}

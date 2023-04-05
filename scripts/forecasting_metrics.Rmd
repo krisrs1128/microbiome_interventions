@@ -80,8 +80,8 @@ metrics <- result$metrics
 ```
 
 ```{r}
-#ggplot(metrics) +
-#  geom_boxplot(aes(lag, mae))
+ggplot(metrics) +
+ geom_boxplot(aes(lag, mae))
 ```
 
 we can evaluate the overall training time
