@@ -1,0 +1,127 @@
+---
+title: "Gather Simulation Metrics"
+output: 
+  html_document:
+    highlight: "kate"
+date: "`r Sys.Date()`"
+params:
+  data_dir: "tf_sim/"
+  run_id: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r libraries}
+library(glue)
+library(fs)
+library(tidyverse)
+library(mbtransfer)
+library(mdsine)
+library(tfPaper)
+set.seed(20230325)
+```
+
+```{r configurations}
+configurations <- dir_ls(params$data_dir) |>
+  path_abs() |>
+  method_configurations()
+
+attach(as.list(configurations[params$run_id, ]))
+```
+
+This script doesn't presume to know which input datasets are to be considered.
+It just runs on whatever data are available and computes metrics if possible.
+The main parameters are related to cross validation, the method to use, the data
+to use, and any ground truth needed in order to compute metrics.
+
+```{r ts-object}
+load(as.character(data_path))
+hyper <- c(hyper[[1]], list(taxonomy = taxonomy))
+
+interventions_df <- data.frame(interventions) |>
+  rownames_to_column("sample")
+metadata <- metadata |>
+  left_join(interventions_df) |>
+  rename(condition = P1)
+reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
+
+ts <- reads |>
+  normalize(normalization, metadata) |>
+  ts_from_dfs(interventions, metadata, subject_data) |>
+  interpolate()
+```
+
+First, the forecasting metrics.
+
+```{r cross_validation}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    if (method == "mdsine") {
+      mdsine(ts, hyper$taxonomy)
+    } else if (method == "mbtransfer") {
+      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
+    }
+  }
+}
+
+result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
+metrics <- result$metrics
+```
+
+```{r}
+#ggplot(metrics) +
+#  geom_boxplot(aes(lag, mae))
+```
+
+we can evaluate the overall training time
+
+```{r compute_time}
+start <- Sys.time()
+fit <- tr_fun(method, hyper)(ts)
+time_diff <- Sys.time() - start
+```
+
+Next, the hypothesis testing metrics.
+
+```{r multisplit_mirrors}
+if (method == "mbtransfer") {
+  lags <- time_lags(fit@parameters[[1]])
+} else {
+  lags <- c(5, 5)
+}
+
+ws <- steps(c("P1" = TRUE), L = max(lags))
+effects <- pd_splits(ts, ws[[1]], ws[[2]], 2, tr_fun(method, hyper), n_sample = 10)
+ms <- consistency_mirror_multisplit(effects)
+```
+
+```{r false_discovery_estimates}
+ms_ <- ms |>
+  select(multisplit, m, lag) %>%
+  split(.$lag) %>%
+  map(~ split(., .$multisplit) %>% map(~ pull(., m)))
+
+testing_results <- list()
+for (l in seq_len(max(lags))) {
+  R <- str_c("tax", which(multiple_data_splitting(ms_[[l]])))
+  S <- intersect(str_c("tax", nonnull_taxa[[l]]),  R)
+  V <- setdiff(R, str_c("tax", nonnull_taxa[[l]]))
+
+  testing_results[[l]] <- list(
+    R = R,
+    truth = nonnull_taxa[[l]],
+    fdp = length(V) / max(length(R), 1),
+    power = length(S) / length(nonnull_taxa[[l]])
+  )
+}
+```
+
+```{r save_results}
+save(metrics, time_diff, testing_results, fit, file = output_path)
+```
+
+```{r session}
+sessionInfo()
+```

@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 1
+  run_id: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -26,7 +26,16 @@ set.seed(20230325)
 ```{r configurations}
 configurations <- dir_ls(params$data_dir) |>
   path_abs() |>
-  method_configurations()
+  method_configurations() |>
+  mutate(data_path_base = basename(as.character(data_path)))
+
+data_config <- data_parameters() |>
+  mutate(data_path_base = basename(output_path)) |>
+  select(-output_path)
+
+configurations <- configurations |>
+  left_join(data_config) |>
+  filter(method == "mdsine" & n_taxa > 100)
 
 attach(as.list(configurations[params$run_id, ]))
 ```
@@ -71,8 +80,8 @@ metrics <- result$metrics
 ```
 
 ```{r}
-ggplot(metrics) +
-  geom_boxplot(aes(lag, mae))
+#ggplot(metrics) +
+#  geom_boxplot(aes(lag, mae))
 ```
 
 we can evaluate the overall training time
@@ -83,43 +92,8 @@ fit <- tr_fun(method, hyper)(ts)
 time_diff <- Sys.time() - start
 ```
 
-Next, the hypothesis testing metrics.
-
-```{r multisplit_mirrors}
-if (method == "mbtransfer") {
-  lags <- time_lags(fit@parameters[[1]])
-} else {
-  lags <- c(1, 1)
-}
-
-ws <- steps(c("P1" = TRUE), L = 1)
-effects <- pd_splits(ts, ws[[1]], ws[[3]], 2, tr_fun("mbtransfer", hyper), n_sample = 10)
-ms <- consistency_mirror_multisplit(effects)
-```
-
-```{r false_discovery_estimates}
-ms_ <- ms |>
-  select(multisplit, m, lag) %>%
-  split(.$lag) %>%
-  map(~ split(., .$multisplit) %>% map(~ pull(., m)))
-
-testing_results <- list()
-for (l in seq_len(max(lags))) {
-  R <- str_c("tax", which(multiple_data_splitting(ms_[[l]])))
-  S <- intersect(str_c("tax", nonnull_taxa[[l]]),  R)
-  V <- setdiff(R, str_c("tax", nonnull_taxa[[l]]))
-
-  testing_results[[l]] <- list(
-    R = R,
-    truth = nonnull_taxa[[l]],
-    fdp = length(V) / max(length(R), 1),
-    power = length(S) / length(nonnull_taxa[[lag]])
-  )
-}
-```
-
 ```{r save_results}
-save(metrics, time_diff, testing_results, fit, file = output_path)
+save(metrics, time_diff, fit, file = output_path)
 ```
 
 ```{r session}

@@ -3,8 +3,7 @@ import pathlib
 from mdsine2.names import STRNAMES
 
 def set_params(model="NegBin", **kwargs):
-  params = {"seed": 0, "burnin": 10, "n_samples": 100, "checkpoint": 25, "basepath": "."}
-  #params = {"seed": 0, "burnin": 2, "n_samples": 10, "checkpoint": 5, "basepath": "."}
+  params = {"seed": 0, "burnin": 100, "n_samples": 1000, "checkpoint": 250, "basepath": "."}
   params.update(**kwargs)
 
   if model == "NegBin":
@@ -54,10 +53,11 @@ def forward_simulate(fit, x0, perturbations=None, starts=None, ends=None,
 
   growth = md2.summary(fit.graph[STRNAMES.GROWTH_VALUE])["mean"]
   interactions = md2.summary(fit.graph[STRNAMES.INTERACTIONS_OBJ])["mean"]
+
   dyn = md2.model.gLVDynamicsSingleClustering(
-    growth=growth, 
-    interactions=interactions, 
-    perturbations=perturbations, 
+    growth=growth,
+    interactions=interactions,
+    perturbations=perturbations,
     perturbation_starts=starts, 
     perturbation_ends=ends
   )
