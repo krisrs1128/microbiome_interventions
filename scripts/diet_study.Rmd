@@ -100,87 +100,16 @@ effects.
 subject_data(ts) <- subject_data(ts) |>
   mutate(diet = ifelse(diet == "Plant", 0, 1))
 
-fit <- train(ts, method = "mbtransfer", list(P = 2, Q = 2))
-```
-
-We can predict the trajectories for a few profiles starting at some typical
-community structures.
-
-```{r}
-x <- do.call(cbind, map(ts, values))
-profiles <- kmeans(t(x), centers = 5)$centers
-```
-
-This is a bit too much worko to be practical... how to make this easier?
-
-```{r}
-n_past <- 5
-n_future <- 10
-sim_names <- str_c("pred", seq_len(n_past + n_future))
-pred_reads <- profiles[rep(1, n_past), ]
-pred_interventions <- data.frame(Plant = c(rep(0, n_past), rep(1, n_future)))
-rownames(pred_interventions) <- sim_names
-rownames(pred_reads) <- sim_names[seq_len(n_past)]
-pred_samples <- data.frame(
-  sample = sim_names[seq_len(n_past)],
-  subject = "imagined",
-  time = seq_len(n_past)
-) |>
-  mutate(condition = ifelse(time > n_past, "Plant", "Nomrmal"))
-pred_subject <- data.frame(
-  subject = "imagined",
-  diet = 1
-)
-
-ts_pred <- ts_from_dfs(pred_reads, pred_interventions, pred_samples, pred_subject)
-pred_interventions <- matrix(0, nrow = 2, ncol = n_past + n_future)
-pred_interventions[1, seq(n_past + 1, n_past + n_future)] <- 1
-rownames(pred_interventions) <- c("Plant", "Animal")
-interventions(ts_pred[[1]]) <- pred_interventions
-
-y_hat <- predict(fit, ts_pred)
+fit <- mbtransfer(ts, P = 1, Q = 1, nrounds = 100)
 ```
 
 ```{r}
-y_df <- map_dfr(y_hat, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
-  pivot_longer(starts_with("Otu"), names_to = "taxon")
-
-ggplot(y_df) +
-  geom_tile(aes(time, reorder(taxon, value), fill = asinh(value))) +
-  scale_fill_distiller(direction = 1)
+ts1_missing <- ts[1]
+values(ts1_missing[[1]]) <- values(ts1_missing[[1]])[, 1:8]
+ts1_pred <- predict(fit, ts1_missing[1])
 ```
 
 ```{r}
-ts_pred <- ts[1]
-values(ts_pred[[1]]) <- t(profiles[rep(1, 4), ])
-
-inter <- interventions(ts_pred[[1]])[, 1:8]
-n_time <- ncol(inter)
-inter[, seq_len(n_time / 2)] <- 0
-inter[2, seq(n_time / 2, n_time)] <- 1
-interventions(ts_pred[[1]]) <- inter
-y_hat <- predict(fit, ts_pred)
+values(ts[[1]][1, ])
+values(ts1_pred[[1]][1, ])
 ```
-
-```{r}
-y_df <- map_dfr(y_hat, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
-  pivot_longer(starts_with("Otu"), names_to = "taxon")
-
-library(ggrepel)
-ggplot(y_df) +
-  geom_line(aes(time, asinh(value), group = taxon)) +
-  geom_text_repel(data = filter(y_df, time == 3, value < 2), aes(3, asinh(value), label = taxon))
-```
-```{r}
-w <- counterfactual_interventions(2, 2)
-effects <- pd_splits(ts, w$w0, w$w1, 1, method = "mbtransfer", hyper = list(P = 2, Q = 2))
-```
-
-
-```{r}
-values_df |>
-  group_by(taxon) |>
-  mutate(value = rank(value)) |>
-  interaction_hm(subject, c("Otu000001", "Otu000005"), "diet")
-```
-
