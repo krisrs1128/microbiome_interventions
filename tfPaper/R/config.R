@@ -24,9 +24,9 @@ data_parameters <- function(output_root="~/Downloads/") {
   expand.grid(
     n_subject = 50,
     n_time = 30,
-    prop_nonnull = c(0.15, 0.3),
+    prop_nonnull = c(0.1, 0.2, 0.4),
     signal_B = c(0.5, 1, 2),
-    n_taxa = c(50, 100),
+    n_taxa = c(50, 100, 200, 400),
     replicate = seq_len(3)
   ) |>
     mutate(output_path = glue("{output_root}/sim_input_{str_pad(row_number(), 3, 'left', '0')}.rda"))
@@ -36,11 +36,13 @@ data_parameters <- function(output_root="~/Downloads/") {
 fixed_parameters <- function() {
   list(
     n_perturb = 1,
-    n_covariates = 3, 
+    n_covariates = 1, 
+    prop_interaction = 0.4,
     n_latent = 4,
     normalizer_A = 0.5,
     normalizer_C = 0.2,
     sparsity_A = 0.8,
+    signal_C = 0.5,
     n_lag = 3
   )
 }

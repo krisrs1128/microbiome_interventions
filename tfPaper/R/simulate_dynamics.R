@@ -2,7 +2,7 @@
 #' @export
 step_t <- function(f, g, h) {
   fun <- function(x, w, z) {
-    f$fun(x) + g$fun(w) + h$fun(x, w)
+    f$fun(x) + g$fun(w) + h$fun(z, w)
   }
   params <- list(P = f$lag, Q = g$lag, PQ = h$lag)
   list(fun = fun, params = params)
@@ -130,16 +130,13 @@ random_interventions <- function(n_perturb, n_time, n_lag = 3) {
 
 #' @export
 interaction_sum <- function(coefs) {
-  n_taxa <- length(coefs)
-  n_lag <- length(coefs[[1]])
+  n_lag <- length(coefs)
+  n_taxa <- nrow(coefs[[1]])
   
-  fun <- function(x, w) {
+  fun <- function(z, w) {
     result <- matrix(0, n_taxa, 1)
- 
     for (l in seq(n_lag)) {
-      for (j in seq_len(n_taxa)) {
-        result[j, 1] <- result[j, 1] + t(x[, n_lag - l + 1]) %*% coefs[[j]][[l]] %*% w[, n_lag - l + 1]
-      }
+      result <- result + (coefs[[l]] * z) %*% w[, n_lag - l + 1]
     }
     result
   }
