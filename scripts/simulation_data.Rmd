@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  run_id: 1
+  run_id: 7
 ---
 
 ```{r setup, include=FALSE}
@@ -48,9 +48,10 @@ effect on species $j$ if there is a nonzero entry in $A_{ij}$.
 for (i in seq(2, n_lag)) {
   e <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$marginal
   f <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$interaction
+
   nonnull_taxa[[i]] <- list(
-    marginal = which((A[[i - 1]] %*% ifelse(e, 1, 0)) != 0),
-    interaction = which((A[[i - 1]] %*% ifelse(f, 1, 0)) != 0)
+    marginal = unique(c(which(e), which(A[[i - 1]] %*% ifelse(e, 1, 0) != 0))),
+    interaction = unique(c(which(f), which(A[[i - 1]] %*% ifelse(f, 1, 0) != 0)))
   )
 }
 ```
