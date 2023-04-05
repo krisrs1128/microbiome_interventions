@@ -12,7 +12,7 @@ method_configurations <- function(data_paths) {
     separate(method_hyper, c("method", "hyper"), convert = TRUE) |>
     mutate(
       hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
-      output_path = glue("result-{str_pad(row_number(), 2, 'left', '0')}.rda")
+      output_path = glue("result-{str_pad(row_number(), 3, 'left', '0')}.rda")
     ) |>
     filter(!(normalization == "mbImpute" & method == "mdsine"))
 }
@@ -25,7 +25,7 @@ data_parameters <- function(output_root="~/Downloads/") {
     n_subject = 50,
     n_time = 30,
     prop_nonnull = c(0.1, 0.2, 0.4),
-    signal_B = c(0.5, 1, 2),
+    signal_B = c(0.25, 0.5, 1),
     n_taxa = c(50, 100, 200, 400),
     replicate = seq_len(3)
   ) |>
@@ -41,7 +41,7 @@ fixed_parameters <- function() {
     n_latent = 4,
     normalizer_A = 0.5,
     normalizer_C = 0.2,
-    sparsity_A = 0.8,
+    sparsity_A = 0.9,
     signal_C = 0.5,
     n_lag = 3
   )
