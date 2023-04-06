@@ -110,7 +110,7 @@ testing_results <- bind_rows(testing_results, .id = "method")
 ```
 
 ```{r save_results}
-save(testing_results, fit, ms, file = output_path)
+save(testing_results, ms, file = output_path)
 ```
 
 ```{r session}

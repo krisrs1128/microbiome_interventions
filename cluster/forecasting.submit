@@ -8,7 +8,7 @@ environment = "process=$(Process)"
 should_transfer_files = YES
 transfer_input_files = microbiome_interventions.tar.gz
 request_cpus = 1
-request_memory = 6GB
-request_disk = 2GB
+request_memory = 12GB
+request_disk = 4GB
 requirements = (Target.HasCHTCStaging == true)
 queue 2
