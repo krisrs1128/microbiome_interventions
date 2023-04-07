@@ -18,8 +18,8 @@ for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); d
   Rscript -e "rmarkdown::render('scripts/forecasting_metrics.Rmd', params = list(data_dir = '../tf_sim/', run_id=${RUN}))"
 done
 
-mkdir result-${process}
-mv scripts/result*rda result-${process}
-mv scripts/*html result-${process}
+mkdir forecasting-${process}
+mv scripts/result*rda forecasting-${process}
+mv scripts/*html forecasting-${process}
 tar -zcvf forcasting-${process}.tar.gz forecasting-${process}
 cp forecasting-*tar.gz /staging/ksankaran/microbiome_interventions/

@@ -17,8 +17,8 @@ for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); d
   Rscript -e "rmarkdown::render('scripts/inference_metrics.Rmd', params = list(data_dir = '../tf_sim/', run_id=${RUN}))"
 done
 
-mkdir result-${process}
-mv scripts/result*rda result-${process}
-mv scripts/*html result-${process}
+mkdir inference-${process}
+mv scripts/result*rda inference-${process}
+mv scripts/*html inference-${process}
 tar -zcvf inference_result-${process}.tar.gz inference-${process}
 cp inference_result*tar.gz /staging/ksankaran/microbiome_interventions/
