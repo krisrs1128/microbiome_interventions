@@ -1,14 +1,14 @@
 
 #' @importFrom xgboost xgboost
 #' @export
-mbtransfer <- function(ts_inter, P = 1, Q = 1, verbose = 0, nrounds = 25, objective = "reg:pseudohubererror", ...) {
+mbtransfer <- function(ts_inter, P = 1, Q = 1, verbose = 0, nrounds = 200, ...) {
   train_data <- patchify_df(ts_inter, P, Q)
   fit <- list()
   for (j in seq_along(train_data$y)) {
-    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, verbose = verbose, objective = objective, ...)
+    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, verbose = verbose, ...)
   }
   
-  hyper <- list(P = P, Q = Q, nrounds = nrounds, objective = objective)
+  hyper <- list(P = P, Q = Q, nrounds = nrounds, ...)
   new("mbtransfer_model", parameters = fit, method = "mbtransfer", hyper = hyper)
 }
 

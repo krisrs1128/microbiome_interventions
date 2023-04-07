@@ -44,6 +44,18 @@ multi_subset <- function(x, i = NULL, j = NULL, ..., drop = FALSE) {
   new("ts_inter", series = result, subject_data = x@subject_data)
 }
 
+#' Subset values of a ts object
+#' 
+#' @export
+subset_values <- function(ts, ix) {
+  ts_missing <- ts
+  for (i in seq_along(ts)) {
+    values(ts_missing[[i]]) <- values(ts_missing[[i]][, ix])
+    ts_missing[[i]]@time <- ts_missing[[i]][, ix]@time
+  }
+  ts_missing
+}
+
 setMethod("length", "ts_inter", function(x) length(x@series))
 setMethod("nrow", "ts_inter_single", function(x) nrow(x@values))
 setMethod("ncol", "ts_inter_single", function(x) ncol(x@values))

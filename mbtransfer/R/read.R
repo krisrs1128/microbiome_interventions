@@ -34,6 +34,7 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
   new("ts_inter", series = series, subject_data = subject_data)
 }
 
+#' @export
 ts_to_dfs <- function(ts) {
   reads <- do.call(cbind, map(ts, ~ values(.)))
   interventions <- do.call(cbind, map(ts, ~ interventions(.)))
@@ -49,4 +50,21 @@ ts_to_dfs <- function(ts) {
     metadata = metadata,
     subject_data = subject_data(ts)
   )
+}
+
+#' Joined ts dfs
+#' @importFrom tibble rownames_to_column
+#' @importFrom dplyr left_join
+#' @export
+pivot_ts <- function(ts) {
+  dfs <- ts_to_dfs(ts)
+  
+  reads <- data.frame(dfs$reads) |>
+    data.frame() |>
+    rownames_to_column("taxon") |>
+    pivot_longer(-taxon, names_to = "sample")
+ 
+  reads |>
+    left_join(dfs$metadata) |>
+    left_join(dfs$subject)
 }

@@ -18,7 +18,7 @@ patchify_single <- function(ts_inter, p = 2, q = 3) {
     if (length(x_indices[[i]]) == p & 
         length(w_indices[[i]]) == q & 
         length(y_indices[[i]]) == 1) {
-      data$x[[k]] <- values_[, x_indices[[i]], drop = FALSE]
+      data$x[[k]] <- cbind(values_[, x_indices[[i]], drop = FALSE])
       data$w[[k]] <- interventions_[, w_indices[[i]], drop = FALSE]
       data$y[[k]] <- values_[, y_indices[[i]], drop = FALSE]
       k <- k + 1
@@ -36,7 +36,7 @@ patchify_single_df <- function(ts_inter, p, q) {
   w <- data$w
   
   result <- list(
-    x = matrix(nrow = length(x), ncol = length(x[[1]]) + length(w[[1]])),
+    x = matrix(nrow = length(x), ncol = 1 + length(x[[1]]) + length(w[[1]])),
     y = matrix(nrow = length(x), ncol = length(y[[1]]))
   )
   
@@ -44,7 +44,7 @@ patchify_single_df <- function(ts_inter, p, q) {
     xi <- matrix(x[[i]], nrow = 1)
     result$y[i, ] <- matrix(y[[i]], nrow = 1)
     wi <- matrix(w[[i]], nrow = 1)
-    result$x[i, ] <- cbind(xi, wi)
+    result$x[i, ] <- cbind(1, xi, wi)
   }
   
   colnames(result$x) <- predictor_names(dim(x[[1]]), dim(w[[1]]))
@@ -76,7 +76,7 @@ patchify_df <- function(ts_inter, p = 2, q = 3) {
 predictor_names <- function(x_dim, w_dim) {
   n1 <- rep(str_c("taxon", seq_len(x_dim[1])), x_dim[2])
   n2 <- rep(str_c("lag", seq(x_dim[2], 1)), each = x_dim[1])
-  x_names <- str_c(n1, "_", n2)
+  x_names <- c("intercept", str_c(n1, "_", n2))
   
   n1 <- rep(str_c("intervention", seq_len(w_dim[1])), w_dim[2])
   n2 <- rep(str_c("lag", seq(w_dim[2] - 1, 0)), each = w_dim[1])
@@ -128,7 +128,7 @@ predictors <- function(ts_inter, lags, subject) {
   x_prev <- x[, seq(n_time - lags[1] + 1, by = 1, length.out = lags[1]), drop = FALSE]
   w_prev <- w[, seq(n_time - lags[2] + 2, by = 1, length.out = lags[2]), drop = FALSE]
   
-  xw <- cbind(matrix(x_prev, nrow = 1), matrix(w_prev, nrow = 1)) |>
+  xw <- cbind(intercept = 1, matrix(x_prev, nrow = 1), matrix(w_prev, nrow = 1)) |>
     as.data.frame() |>
     set_names(predictor_names(dim(x_prev), dim(w_prev))) |>
     as.matrix()
