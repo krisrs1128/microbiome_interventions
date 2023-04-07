@@ -35,7 +35,7 @@ data_config <- data_parameters() |>
 
 configurations <- configurations |>
   left_join(data_config) |>
-  filter(method == "mdsine" & n_taxa > 100)
+  filter(!(method == "mdsine" & n_taxa > 100))
 
 attach(as.list(configurations[params$run_id, ]))
 ```
