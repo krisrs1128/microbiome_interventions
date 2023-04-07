@@ -18,7 +18,7 @@ for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); d
 done
 
 mkdir inference-${process}
-mv scripts/result*rda inference-${process}
+mv scripts/*rda inference-${process}
 mv scripts/*html inference-${process}
 tar -zcvf inference_result-${process}.tar.gz inference-${process}
 cp inference_result*tar.gz /staging/ksankaran/microbiome_interventions/

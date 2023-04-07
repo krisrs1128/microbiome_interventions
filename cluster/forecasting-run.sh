@@ -19,7 +19,7 @@ for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); d
 done
 
 mkdir forecasting-${process}
-mv scripts/result*rda forecasting-${process}
+mv scripts/*rda forecasting-${process}
 mv scripts/*html forecasting-${process}
-tar -zcvf forcasting-${process}.tar.gz forecasting-${process}
+tar -zcvf forecasting-${process}.tar.gz forecasting-${process}
 cp forecasting-*tar.gz /staging/ksankaran/microbiome_interventions/
