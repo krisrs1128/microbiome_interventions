@@ -99,17 +99,31 @@ effects.
 ```{r}
 subject_data(ts) <- subject_data(ts) |>
   mutate(diet = ifelse(diet == "Plant", 0, 1))
-
-fit <- mbtransfer(ts, P = 1, Q = 1, nrounds = 100)
+fit <- mbtransfer(ts, P = 1, Q = 1)
 ```
 
 ```{r}
-ts1_missing <- ts[1]
-values(ts1_missing[[1]]) <- values(ts1_missing[[1]])[, 1:8]
-ts1_pred <- predict(fit, ts1_missing[1])
+ts_missing <- subset_values(ts, 1:8)
+ts_pred <- mbtransfer_predict(fit, ts_missing)
 ```
 
 ```{r}
-values(ts[[1]][1, ])
-values(ts1_pred[[1]][1, ])
+ts_df <- pivot_ts(ts_pred) |>
+  rename(y_hat = value) |>
+  select(taxon, sample, time, y_hat) |>
+  left_join(pivot_ts(ts)) |>
+  rename(y = value) |>
+  filter(y != y_hat)
+```
+
+
+```{r, fig.width = 8, fig.height = 8}
+ts_df |>
+  filter(taxon %in% unique(ts_df$taxon)[1:16]) |>
+  ggplot() +
+  geom_abline(slope = 1, col = "#F25A38") +
+  geom_point(aes(y, y_hat), size = 0.5, alpha = 0.8) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ taxon, scales = "free")
 ```
