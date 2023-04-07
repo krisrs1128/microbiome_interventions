@@ -3,7 +3,7 @@ import pathlib
 from mdsine2.names import STRNAMES
 
 def set_params(model="NegBin", **kwargs):
-  params = {"seed": 0, "burnin": 100, "n_samples": 1000, "checkpoint": 250, "basepath": "."}
+  params = {"seed": 0, "burnin": 50, "n_samples": 500, "checkpoint": 250, "basepath": "."}
   params.update(**kwargs)
 
   if model == "NegBin":

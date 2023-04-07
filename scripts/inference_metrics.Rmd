@@ -88,7 +88,7 @@ tr_fun <- function(x) {
   mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q)
 }
 
-effects <- pd_splits(ts, ws[[1]], ws[[2]], 3, tr_fun, n_sample = 10)
+effects <- pd_splits(ts, ws[[1]], ws[[2]], 50, tr_fun)
 ms <- consistency_mirror_multisplit(effects)
 ```
 
