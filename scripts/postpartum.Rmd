@@ -7,12 +7,17 @@ date: "`r Sys.Date()`"
 ---
 
 ```{r}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r}
 library(RColorBrewer)
 library(ggh4x)
 library(fs)
 library(tidyverse)
 library(mbtransfer)
-theme_set(theme_bw())
+library(tfPaper)
+theme_set(my_theme())
 ```
 
 ```{r}
@@ -37,7 +42,7 @@ reads <- post.df |>
 subject_data <- post.df |>
   select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
   ungroup() |>
-  mutate(bmi_cut = cut(BmiPre, breaks = quantile(subject_data$BmiPre, seq(0, 1, length.out = 4)))) |>
+  mutate(bmi_cut = cut(BmiPre, breaks = quantile(BmiPre, seq(0, 1, length.out = 4)))) |>
   rename(subject = SubjID) |>
   group_by(subject) |>
   filter(row_number() == 1)
@@ -52,7 +57,6 @@ interventions <- sample_data |>
 ```
 
 ```{r}
-#interventions <- 
 sample_data |>
   left_join(interventions |> rownames_to_column("sample")) |>
   ggplot() +
@@ -61,50 +65,16 @@ sample_data |>
 
 ```{r}
 ts <- ts_from_dfs(reads, interventions, sample_data, subject_data)
-```
-
-```{r}
 ts_ <- interpolate(ts, delta = 14, method = "linear")
 ```
 
 ```{r}
-plot(values(ts_[[1]])[8, ])
-```
+values_df <- pivot_ts(ts_)
 
-
-```{r}
-values_df <- map_dfr(ts_, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
-  pivot_longer(Lactobacillus:L.other, names_to = "taxon")
-```
-
-```{r}
 taxa <- c("L.gasseri", "Lactobacillus", "Gardnerella")
 interaction_hm(values_df, subject_data, taxa, "Race", -1)
 interaction_hm(values_df, subject_data, taxa, "BirthControlYesNo", -1)
 interaction_hm(values_df, subject_data, taxa, "bmi_cut", -1)
-```
-
-```{r}
-interaction_barcode <- function(values_df, subject_data, taxa, condition) {
-  values_df |>
-    filter(taxon %in% taxa) |>
-    left_join(subject_data) |>
-    mutate(subject = factor(subject, levels = subject_order(values_df, taxa))) |>
-    ggplot() +
-    geom_tile(aes(time, taxon, fill = value, col = value), width = 14) +
-    scale_x_continuous(expand = c(0, 0)) +
-    facet_nested(reorder(.data[[condition]], -value) + subject ~ ., scales = "free", space = "free") +
-    scale_fill_distiller(direction = 1) +
-    scale_color_distiller(direction = 1) +
-    theme(
-      panel.spacing = unit(0, "line"),
-      panel.border = element_rect(linewidth = 1, fill = NA, color = "#d3d3d3"),
-      strip.text.y = element_text(angle = 0),
-      panel.grid = element_blank(),
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank()
-    )
-}
 ```
 
 ```{r, fig.height = 12, fig.width = 6}
@@ -112,6 +82,3 @@ interaction_barcode(values_df, subject_data, taxa, "Race")
 interaction_barcode(values_df, subject_data, taxa, "BirthControlYesNo")
 interaction_barcode(values_df, subject_data, taxa, "bmi_cut")
 ```
-
-
-

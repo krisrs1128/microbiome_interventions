@@ -34,6 +34,27 @@ interaction_hm <- function(values_df, subject_data, taxa, condition, r = 0) {
     )
 }
 
+#' @export
+interaction_barcode <- function(values_df, subject_data, taxa, condition) {
+  values_df |>
+    filter(taxon %in% taxa) |>
+    mutate(subject = factor(subject, levels = subject_order(values_df, taxa))) |>
+    ggplot() +
+    geom_tile(aes(time, taxon, fill = value, col = value), width = 14) +
+    scale_x_continuous(expand = c(0, 0)) +
+    facet_nested(reorder(.data[[condition]], -value) + subject ~ ., scales = "free", space = "free") +
+    scale_fill_distiller(direction = 1) +
+    scale_color_distiller(direction = 1) +
+    theme(
+      panel.spacing = unit(0, "line"),
+      panel.border = element_rect(linewidth = 1, fill = NA, color = "#d3d3d3"),
+      strip.text.y = element_text(angle = 0),
+      panel.grid = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    )
+}
+
 #' @importFrom ggplot2 theme_minimal theme
 #' @export
 my_theme <- function() {

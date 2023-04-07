@@ -5,7 +5,7 @@ date: "`r Sys.Date()`"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
 ```{r}
@@ -13,7 +13,7 @@ library(tfPaper)
 library(mbtransfer)
 library(tidyverse)
 library(fs)
-theme_set(theme_bw())
+theme_set(my_theme())
 ```
 
 ```{r}
