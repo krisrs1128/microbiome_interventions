@@ -11,3 +11,7 @@ mdsine/inst/MDSINE2/build/
 mdsine/inst/MDSINE2/mdsine2.egg-info
 *DS_Store*
 *.rda
+data
+*.Rproj
+*.tar.gz
+*buildignore
