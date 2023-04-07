@@ -4,7 +4,7 @@ output:
   html_document:
     highlight: "kate"
 params:
-  outputs_dir: "~/Downloads"
+  outputs_dir: "../data/simulation_output/"
   outputs_filter: "*rda"
 date: "`r Sys.Date()`"
 ---
@@ -22,7 +22,7 @@ theme_set(my_theme())
 ```
 
 ```{r}
-data_var <- varying_parameters("~/Downloads") |>
+data_var <- data_parameters(params$outputs_dir) |>
   mutate(data_path = factor(output_path)) |>
   select(-output_path)
 configurations <- method_configurations(data_var$data_path) |>
@@ -33,30 +33,28 @@ configurations <- method_configurations(data_var$data_path) |>
 configurations[c(5,6, 11, 12), ]
 ```
 
-It looks like configurations 5/6 and 11/12 have failed. Why? These are all the
-MDSINE runs that we had launched. Can we reproduce this locally? My
-understanding was that the new (always nonnegative) normalization should allow
-the model to fit well. But perhaps we need to round?
-
-The timing of the failures suggests that it was running the most recent versions
-of the code.
-
 ```{r}
 paths <- dir_ls(params$outputs_dir, recurse = TRUE) |>
   path_filter(regexp=params$outputs_filter)
 
 metadata <- paths |>
   as_tibble() |>
-  mutate(
-    output_path = basename(value)
-  ) |>
+  mutate(output_path = basename(value)) |>
   rename(full_path = value) |>
   left_join(configurations)
 ```
 
+## Forecasting Results
 ```{r}
-metrics <- map_dfr(paths, ~ { load(.); metrics }, .id = "full_path")
-computation <- map_dfr(paths, ~ { load(.); tibble(time_diff = time_diff) }, .id = "full_path")
+metrics <- paths |>
+  path_filter("*forecasting*") |>
+  map_dfr(~ { load(.); metrics }, .id = "full_path")
+```
+
+```{r}
+computation <- paths |>
+  path_filter("*forecasting*") |>
+  map_dfr(~ { load(.); tibble(time_diff = time_diff) }, .id = "full_path")
 ```
 
 ```{r}
@@ -68,12 +66,44 @@ computation |>
 
 ```{r}
 metrics <- metrics |>
-  select(full_path, starts_with("mae")) |>
+  select(full_path, matches("mse|mae")) |>
   left_join(metadata) |>
   unnest_wider("hyper")
 
 ggplot(metrics) +
-  geom_boxplot(aes(interaction(n_subject, n_time), mae, fill = as.factor(P))) +
+  geom_boxplot(aes(interaction(n_subject, n_time), mae, fill = method)) +
   facet_wrap( ~ normalization) +
   scale_y_sqrt()
+```
+
+### Inferential Results
+
+```{r}
+inference_config <- configurations |>
+  filter(map_lgl(hyper, ~ !is.null(.$P) > 0 && .$P == 2)) |>
+  mutate(output_path = glue("inference-{str_pad(row_number(), 3, 'left', '0')}.rda"))
+
+testing_results <- paths |>
+  path_filter("*inference*") |>
+  map_dfr(~ { load(.); testing_results }, .id = "full_path") |>
+  mutate(output_path = path_file(full_path)) |>
+  select(-method) |> # forecasting method != inference method
+  left_join(inference_config)
+```
+
+```{r}
+testing_results |>
+  filter(type == "marginal") |>
+  ggplot() +
+  geom_vline(xintercept = 0.2, col = "#898989", size = 1) +
+  geom_point(aes(fdp, power, col = normalization), size = 3) +
+  scale_color_manual(values = c("#048ABF", "#F2CB05")) +
+  facet_wrap(~ method)
+
+testing_results |>
+  filter(type == "interaction") |>
+  ggplot() +
+  geom_boxplot(aes(method, power, fill = normalization, col = normalization), alpha = 0.3) +
+  scale_fill_manual(values = c("#048ABF", "#F2CB05")) +
+  scale_color_manual(values = c("#048ABF", "#F2CB05"))
 ```
