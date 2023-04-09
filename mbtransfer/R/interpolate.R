@@ -1,10 +1,11 @@
 
+#' @importFrom glue glue
 #' @export
 interpolate <- function(ts_inter, delta = 1, method = "constant") {
   for (i in seq_along(ts_inter)) {
     ts_inter[[i]] <- interpolate_(ts_inter[[i]], delta, method)
-    colnames(values(ts_inter[[i]])) <- str_c("S", i, colnames(values(ts_inter[[i]])))
-    colnames(interventions(ts_inter[[i]])) <- str_c("S", i, colnames(interventions(ts_inter[[i]])))
+    colnames(values(ts_inter[[i]])) <- glue("{names(ts_inter)[i]}_{colnames(values(ts_inter[[i]]))}")
+    colnames(interventions(ts_inter[[i]])) <- glue("{names(ts_inter)[i]}_{colnames(interventions(ts_inter[[i]]))}")
   }
   ts_inter
 }

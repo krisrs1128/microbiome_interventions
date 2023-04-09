@@ -40,8 +40,10 @@ multi_subset <- function(x, i = NULL, j = NULL, ..., drop = FALSE) {
       result[[k]] <- x[[k]][, j]
     }
   }
-  
-  new("ts_inter", series = result, subject_data = x@subject_data)
+
+  ts <- new("ts_inter", series = result, subject_data = x@subject_data)
+  names(ts) <- names(x)
+  ts
 }
 
 #' Subset values of a ts object
@@ -113,6 +115,13 @@ setMethod("subject_data<-", "ts_inter", function(x, value) {
   x@subject_data <- value
   x
 })
+
+#' @export
+setGeneric("taxa", function(x) standardGeneric("taxa"))
+setMethod("taxa", "ts_inter", function(x) {
+  rownames(values(x[[1]]))
+})
+
 
 #' @export
 setMethod("names", "ts_inter", function(x) names(x@series))
