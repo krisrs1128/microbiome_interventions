@@ -4,7 +4,7 @@
 \alias{pd_splits}
 \title{Mirror Splits from Partial Dependence}
 \usage{
-pd_splits(ts, w0, w1, n_splits, tr_fun, ...)
+pd_splits(ts, w0, w1, tr_fun, n_splits = 20, ...)
 }
 \description{
 For ech split, we return an array of dimension n_taxa x 2 fits x n_lags. Each

@@ -4,7 +4,7 @@
 \alias{counterfactual_ts}
 \title{Generate Counterfactual versions of a ts_inter object}
 \usage{
-counterfactual_ts(ts, w0, w1)
+counterfactual_ts(ts, w0, w1, start_ix = NULL)
 }
 \description{
 Generate Counterfactual versions of a ts_inter object
