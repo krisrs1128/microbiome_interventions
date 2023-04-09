@@ -26,7 +26,7 @@ samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "s
   mutate(intervention = str_extract(subject, "[A-z]+"))
 subject <- read_csv(data_dir / "subject_data.csv")
 
-keep_ix <- colMeans(reads != 0) > 0.7 # very aggressive, but just for testing
+keep_ix <- colMeans(reads != 0) > 0.8 # very aggressive, but just for testing
 reads <- reads[, as.logical(keep_ix)]
 ```
 
@@ -65,14 +65,14 @@ samples <- samples |>
 ```
 
 ```{r}
-ts <- ts_from_dfs(reads, interventions, samples, subject) |>
+ts <- reads |>
+  normalize("mbImpute", samples) |>
+  ts_from_dfs(interventions, samples, subject) |>
   interpolate(method = "linear")
-
-values_df <- map_dfr(ts, ~ bind_cols(rownames_to_column(data.frame(t(values(.))), "sample"), time = .@time), .id = "subject") |>
-  pivot_longer(starts_with("Otu"), names_to = "taxon")
+values_df <- pivot_ts(ts)
 ```
 
-```{r, fig.height = 3, fig.width = 10}
+```{r, fig.height = 3, fig.width = 10, eval = FALSE}
 top_taxa <- values_df |>
   group_by(taxon) |>
   summarise(mean = mean(value)) |>
@@ -81,7 +81,7 @@ top_taxa <- values_df |>
 
 values_df |>
   group_by(taxon) |>
-  mutate(value = rank(value)) |>
+  mutate(value = rank(value) / n()) |>
   interaction_hm(subject, top_taxa, "diet")
 ```
 
@@ -99,15 +99,15 @@ effects.
 ```{r}
 subject_data(ts) <- subject_data(ts) |>
   mutate(diet = ifelse(diet == "Plant", 0, 1))
-fit <- mbtransfer(ts, P = 1, Q = 1)
+fit <- mbtransfer(ts, P = 2, Q = 2)
 ```
 
-```{r}
+```{r, eval = FALSE}
 ts_missing <- subset_values(ts, 1:8)
-ts_pred <- mbtransfer_predict(fit, ts_missing)
+ts_pred <- predict(fit, ts_missing)
 ```
 
-```{r}
+```{r, eval = FALSE}
 ts_df <- pivot_ts(ts_pred) |>
   rename(y_hat = value) |>
   select(taxon, sample, time, y_hat) |>
@@ -116,8 +116,7 @@ ts_df <- pivot_ts(ts_pred) |>
   filter(y != y_hat)
 ```
 
-
-```{r, fig.width = 8, fig.height = 8}
+```{r, fig.width = 8, fig.height = 8, eval = FALSE}
 ts_df |>
   filter(taxon %in% unique(ts_df$taxon)[1:16]) |>
   ggplot() +
@@ -127,3 +126,57 @@ ts_df |>
   scale_y_log10() +
   facet_wrap(~ taxon, scales = "free")
 ```
+
+### Inference of Significant Taxa
+
+```{r}
+ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:3, L = 4) |>
+  c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:3, L = 4))
+
+tr_fun <- function(x) {
+  mbtransfer(x, P = 3, Q = 3, verbose = FALSE)
+}
+
+library(glue)
+library(xgboost)
+library(slider)
+library(progress)
+library(abind)
+tmp <- map(list.files("../mbtransfer/R/", full=T), source)
+staxa <- select_taxa(ts, ws[[1]], ws[[8]], tr_fun, n_splits = 20)
+```
+```{r}
+ggplot(staxa$ms) +
+  geom_point(aes(taxon, m)) +
+  facet_wrap(~ lag, scales = "free_y")
+```
+
+
+Let's simulate trajectories and look at the effects for these taxa.
+
+```{r}
+sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[8]], start_ix = 4) |>
+  map(~ predict(fit, .))
+```
+
+```{r, eval = FALSE}
+(sim_ts[[2]] - sim_ts[[1]]) |>
+  pivot_ts() |>
+  interaction_hm(taxa = setdiff(staxa$taxa[[3]], staxa$taxa[[1]])) +
+  scale_color_gradient2() +
+  scale_fill_gradient2()
+```
+
+
+```{r, eval = FALSE, fig.height = 8, fig.width = 16}
+sim_ts |>
+  map_dfr(pivot_ts, .id = "counterfactual") |>
+  filter(taxon %in% setdiff(staxa$taxa[[3]], staxa$taxa[[1]])[1]) |>
+  ggplot() +
+  geom_line(aes(time, value, group = interaction(subject, counterfactual), col = counterfactual)) +
+  facet_wrap(~ taxon + subject)
+```
+
+Let's look at taxa with lagged effects as well.
+
+We can also cluster them.

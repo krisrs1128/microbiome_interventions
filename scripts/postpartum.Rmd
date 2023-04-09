@@ -72,13 +72,13 @@ ts_ <- interpolate(ts, delta = 14, method = "linear")
 values_df <- pivot_ts(ts_)
 
 taxa <- c("L.gasseri", "Lactobacillus", "Gardnerella")
-interaction_hm(values_df, subject_data, taxa, "Race", -1)
-interaction_hm(values_df, subject_data, taxa, "BirthControlYesNo", -1)
-interaction_hm(values_df, subject_data, taxa, "bmi_cut", -1)
+interaction_hm(values_df, taxa, "Race", -1)
+interaction_hm(values_df, taxa, "BirthControlYesNo", -1)
+interaction_hm(values_df, taxa, "bmi_cut", -1)
 ```
 
 ```{r, fig.height = 12, fig.width = 6}
-interaction_barcode(values_df, subject_data, taxa, "Race")
-interaction_barcode(values_df, subject_data, taxa, "BirthControlYesNo")
-interaction_barcode(values_df, subject_data, taxa, "bmi_cut")
+interaction_barcode(values_df, taxa, "Race")
+interaction_barcode(values_df, taxa, "BirthControlYesNo")
+interaction_barcode(values_df, taxa, "bmi_cut")
 ```
