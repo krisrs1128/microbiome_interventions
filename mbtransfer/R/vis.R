@@ -15,15 +15,13 @@ subject_order <- function(values_df, taxa, r = 0) {
 }
 
 #' @export
-interaction_hm <- function(values_df, subject_data, taxa, condition, r = 0) {
-  values_df |>
+interaction_hm <- function(values_df, taxa, condition = NULL, r = 0) {
+  p <- values_df |>
     filter(taxon %in% taxa) |>
-    left_join(subject_data) |>
     mutate(subject = factor(subject, subject_order(values_df, taxa, r))) |>
     ggplot() +
-    geom_tile(aes(time, subject, fill = value, col = value), width = 14) +
+    geom_tile(aes(time, subject, fill = value, col = value)) +
     scale_x_continuous(expand = c(0, 0)) +
-    facet_grid(.data[[condition]] ~ reorder(taxon, -value), scales = "free", space = "free") +
     scale_fill_distiller(direction = 1) +
     scale_color_distiller(direction = 1) +
     theme(
@@ -32,17 +30,24 @@ interaction_hm <- function(values_df, subject_data, taxa, condition, r = 0) {
       panel.border = element_rect(linewidth = 1, fill = NA, color = "#545454"),
       panel.spacing = unit(0, "cm")
     )
+  
+  if (!is.null(condition)) {
+    p <- p + 
+      facet_grid(.data[[condition]] ~ reorder(taxon, -value), scales = "free", space = "free")
+  }
+  
+  p
 }
 
+
 #' @export
-interaction_barcode <- function(values_df, subject_data, taxa, condition) {
-  values_df |>
+interaction_barcode <- function(values_df, taxa, condition = NULL, r = 0) {
+  p <- values_df |>
     filter(taxon %in% taxa) |>
-    mutate(subject = factor(subject, levels = subject_order(values_df, taxa))) |>
+    mutate(subject = factor(subject, levels = subject_order(values_df, taxa, r))) |>
     ggplot() +
-    geom_tile(aes(time, taxon, fill = value, col = value), width = 14) +
+    geom_tile(aes(time, taxon, fill = value, col = value)) +
     scale_x_continuous(expand = c(0, 0)) +
-    facet_nested(reorder(.data[[condition]], -value) + subject ~ ., scales = "free", space = "free") +
     scale_fill_distiller(direction = 1) +
     scale_color_distiller(direction = 1) +
     theme(
@@ -53,6 +58,13 @@ interaction_barcode <- function(values_df, subject_data, taxa, condition) {
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank()
     )
+  
+  if (!is.null(condition)) {
+    p <- p + 
+      facet_nested(reorder(.data[[condition]], -value) + subject ~ ., scales = "free", space = "free")
+  }
+  
+  p
 }
 
 #' @importFrom ggplot2 theme_minimal theme
