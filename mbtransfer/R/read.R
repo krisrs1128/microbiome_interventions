@@ -60,7 +60,6 @@ pivot_ts <- function(ts) {
   dfs <- ts_to_dfs(ts)
   
   reads <- data.frame(dfs$reads) |>
-    data.frame() |>
     rownames_to_column("taxon") |>
     pivot_longer(-taxon, names_to = "sample")
  

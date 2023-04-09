@@ -2,15 +2,12 @@
 #' ts is a single element of a ts_inter class
 #' @export
 replace_inter_ <- function(ts, new_inter, start_ix = NULL) {
-  if (is.null(start_ix)) {
-    start_ix <- ncol(ts)
-  }
-
   inter <- interventions(ts)[, seq_len(start_ix), drop = FALSE]
   interventions(ts) <- cbind(inter, new_inter)
   ts
 }
 
+#' @importFrom glue glue
 #' @export
 replace_inter <- function(ts, new_inter, start_ix = NULL) {
   if (length(start_ix) == 1) {
@@ -19,7 +16,7 @@ replace_inter <- function(ts, new_inter, start_ix = NULL) {
   
   for (i in seq_along(ts)) {
     inter_ <- new_inter
-    colnames(inter_) <- str_c(names(ts)[i], colnames(inter_))
+    colnames(inter_) <- glue("{names(ts)[i]}_{colnames(inter_)}")
     ts[[i]] <- replace_inter_(ts[[i]], inter_, start_ix[i])
   }
   
