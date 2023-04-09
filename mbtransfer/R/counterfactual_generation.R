@@ -13,11 +13,13 @@ to_vector <- function(x) {
 #' Hypothetical Step Interventions
 #' @example
 #' steps(c("P1" = TRUE), 1:3, 2:3, 4)
+#' 
+#' @importFrom glue glue
 #' @export
 steps <- function(p_states, starts = 1, lengths = 1:3, L = 3, w_star = c(0, 1)) {
   w0 <- matrix(0, nrow = length(p_states), ncol = L)
   rownames(w0) <- names(p_states)
-  colnames(w0) <- glue("T+{seq_len(ncol(w0))}")
+  colnames(w0) <- glue("yhat_{seq_len(ncol(w0))}")
   starts <- to_vector(starts)
   lengths <- to_vector(lengths)
   active_p <- names(p_states[p_states])
@@ -25,11 +27,11 @@ steps <- function(p_states, starts = 1, lengths = 1:3, L = 3, w_star = c(0, 1)) 
   result <- list()
   k <- 1
   for (i in seq_along(w_star)) {
-    for (s in seq_along(starts)) {
-      for (l in seq_along(lengths)) {
+    for (s in starts) {
+      for (l in lengths) {
         wi <- w0
-        for (p in seq_along(active_p)) {
-          wi[p, seq(s, min(s + l, ncol(wi)))] <- w_star[i]
+        for (p in active_p) {
+          wi[p, seq(s, min(s + l - 1, ncol(wi)))] <- w_star[i]
         }
         result[[k]] <- wi
         k <- k + 1
@@ -45,11 +47,12 @@ steps <- function(p_states, starts = 1, lengths = 1:3, L = 3, w_star = c(0, 1)) 
 #' pulses(c("P1" = TRUE), 1, 4)
 #' pulses(c("P1" = TRUE), 1:3, 4)
 #" pulses(c("P1" = TRUE), 1:3, 4, seq(0, 1, .2))
+#' @importFrom glue glue
 #' @export
 pulses <- function(p_states, lags = 1, L = 3, w_star = c(0, 1)) {
   w0 <- matrix(0, nrow = nrow(inter), ncol = L)
   rownames(w0) <- rownames(inter)
-  colnames(w0) <- glue("T+{seq_len(ncol(w0))}")
+  colnames(w0) <- glue("Tn_{seq_len(ncol(w0))}")
   lengths <- to_vector(lengths)
   active_p <- names(p_states[p_states])
   
@@ -71,8 +74,12 @@ pulses <- function(p_states, lags = 1, L = 3, w_star = c(0, 1)) {
 
 #' Generate Counterfactual versions of a ts_inter object
 #' @export
-counterfactual_ts <- function(ts, w0, w1) {
-  ts0 <- replace_inter(ts, w0)
-  ts1 <- replace_inter(ts, w1)
+counterfactual_ts <- function(ts, w0, w1, start_ix = NULL) {
+  if (is.null(start_ix)) {
+    start_ix <- map_dbl(ts, ncol)
+  }
+
+  ts0 <- replace_inter(ts[, seq_len(start_ix)], w0, start_ix)
+  ts1 <- replace_inter(ts[, seq_len(start_ix)], w1, start_ix)
   list(ts0 = ts0, ts1 = ts1)
 }

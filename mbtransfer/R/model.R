@@ -1,11 +1,19 @@
 
+#' @importFrom progress progress_bar
+#' @importFrom glue glue
 #' @importFrom xgboost xgboost
 #' @export
-mbtransfer <- function(ts_inter, P = 1, Q = 1, verbose = 0, nrounds = 200, ...) {
+mbtransfer <- function(ts_inter, P = 1, Q = 1, nrounds = 200, early_stopping_rounds = 5, verbose = 0, ...) {
   train_data <- patchify_df(ts_inter, P, Q)
   fit <- list()
+  
+  pb <- progress_bar$new(total = length(train_data$y), format = "[:bar] :percent ETA: :eta")
   for (j in seq_along(train_data$y)) {
-    fit[[j]] <- xgboost(data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, verbose = verbose, ...)
+    pb$tick()
+    fit[[j]] <- xgboost(
+      data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, 
+      early_stopping_rounds = early_stopping_rounds, verbose = verbose, ...
+    )
   }
   
   hyper <- list(P = P, Q = Q, nrounds = nrounds, ...)
@@ -29,6 +37,7 @@ mbtransfer_predict <- function(object, newdata) {
     )
   }
 
+  names(result) <- names(newdata)
   new("ts_inter", series = result, subject_data = subject_data(newdata))
 }
 
