@@ -28,6 +28,7 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
       otu_table(reads, taxa_are_rows = FALSE),
       metadata
     )
+    
     dds <- phyloseq_to_deseq2(ps, fmla)
     size_factors <- sizeFactors(estimateSizeFactors(dds, "poscounts"))
     result <- reads / size_factors
@@ -37,8 +38,11 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   } else if (method == "mbImpute") {
     condition <- pull(metadata, condition)
     metadata <- select(metadata, -condition:-sample)
-    n_cores <- detectCores()
+    if (any(apply(metadata, 2, type) %in% c("factor", "character"))) {
+      metadata <- model.matrix(~ -1 + . , metadata)
+    }
 
+    n_cores <- detectCores()
     if (ncol(metadata) > 0) {
       result <- mbImpute(condition, reads, metadata, ncores = n_cores, parallel = TRUE, ...)$imp_count_mat_lognorm
     } else {
