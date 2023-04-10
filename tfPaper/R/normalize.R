@@ -2,6 +2,7 @@
 #' @importFrom phyloseq phyloseq otu_table sample_data phyloseq_to_deseq2
 #' @importFrom DESeq2 sizeFactors estimateSizeFactors
 #' @importFrom mbImpute mbImpute
+#' @importFrom parallel detectCores
 #' @export
 normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   if (is.null(metadata)) {
@@ -18,7 +19,7 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
     } else {
       fmla <- formula(~ condition)
     }
-    
+
     # construct phyloseq and perform normalization
     metadata <- metadata |>
       column_to_rownames("sample") |>
@@ -36,12 +37,14 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   } else if (method == "mbImpute") {
     condition <- pull(metadata, condition)
     metadata <- select(metadata, -condition:-sample)
+    n_cores <- detectCores()
+
     if (ncol(metadata) > 0) {
-      result <- mbImpute(condition, reads, metadata, ...)$imp_count_mat_lognorm
+      result <- mbImpute(condition, reads, metadata, ncores = n_cores, parallel = TRUE, ...)$imp_count_mat_lognorm
     } else {
-      result <- mbImpute(condition, reads, ...)$imp_count_mat_lognorm
+      result <- mbImpute(condition, reads, ncores = n_cores, parallel = TRUE, ...)$imp_count_mat_lognorm
     }
   }
-  
+
   result
 }
