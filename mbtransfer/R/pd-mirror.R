@@ -63,7 +63,7 @@ pd_summary <- function(y0, y1, ix, summary_fun = mean) {
 
 pd_effects <- function(fit, ts, w0, w1, n_sample = NULL, patch_len = 8) {
   if (is.null(n_sample)) {
-    n_sample <- length(ts) * ncol(ts[[1]])
+    n_sample <- 0.5 * length(ts) * ncol(ts[[1]]) / patch_len
   }
 
   # sampled patches under two counterfactual interventions

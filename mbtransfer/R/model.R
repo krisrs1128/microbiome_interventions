@@ -6,16 +6,16 @@
 mbtransfer <- function(ts_inter, P = 1, Q = 1, nrounds = 200, early_stopping_rounds = 5, verbose = 0, ...) {
   train_data <- patchify_df(ts_inter, P, Q)
   fit <- list()
-  
+
   pb <- progress_bar$new(total = length(train_data$y), format = "[:bar] :percent ETA: :eta")
   for (j in seq_along(train_data$y)) {
     pb$tick()
     fit[[j]] <- xgboost(
-      data = train_data$x, label = train_data$y[[j]], nrounds = nrounds, 
+      data = train_data$x, label = train_data$y[[j]], nrounds = nrounds,
       early_stopping_rounds = early_stopping_rounds, verbose = verbose, ...
     )
   }
-  
+
   hyper <- list(P = P, Q = Q, nrounds = nrounds, ...)
   new("mbtransfer_model", parameters = fit, method = "mbtransfer", hyper = hyper)
 }
@@ -27,12 +27,12 @@ mbtransfer_predict <- function(object, newdata) {
   subject <- subject_data(newdata) |>
     select(-subject) |>
     as.matrix()
-  
+
   for (i in seq_along(newdata)) {
     result[[i]] <- model_predict_single(
-      object@parameters, 
+      object@parameters,
       newdata[[i]],
-      lags, 
+      lags,
       subject[i,, drop = FALSE]
     )
   }
@@ -55,7 +55,6 @@ model_predict_single <- function(fit, ts_inter, lags, subject = NULL) {
 model_predict_step <- function(ts_inter, fit, lags, subject = NULL) {
   xz <- predictors(ts_inter, lags, subject)
   y_hat <- vector(length = nrow(ts_inter))
-
   for (j in seq_len(nrow(ts_inter))) {
     y_hat[j] <- predict(fit[[j]], xz)
   }
