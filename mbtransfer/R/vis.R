@@ -15,12 +15,12 @@ subject_order <- function(values_df, taxa, r = 0) {
 }
 
 #' @export
-interaction_hm <- function(values_df, taxa, condition = NULL, r = 0) {
+interaction_hm <- function(values_df, taxa, condition = NULL, r = 0, ...) {
   p <- values_df |>
     filter(taxon %in% taxa) |>
     mutate(subject = factor(subject, subject_order(values_df, taxa, r))) |>
     ggplot() +
-    geom_tile(aes(time, subject, fill = value, col = value)) +
+    geom_tile(aes(time, subject, fill = value, col = value), ...) +
     scale_x_continuous(expand = c(0, 0)) +
     scale_fill_distiller(direction = 1) +
     scale_color_distiller(direction = 1) +
@@ -40,13 +40,14 @@ interaction_hm <- function(values_df, taxa, condition = NULL, r = 0) {
 }
 
 
+#' @importFrom ggh4x facet_nested
 #' @export
-interaction_barcode <- function(values_df, taxa, condition = NULL, r = 0) {
+interaction_barcode <- function(values_df, taxa, condition = NULL, r = 0, ...) {
   p <- values_df |>
     filter(taxon %in% taxa) |>
     mutate(subject = factor(subject, levels = subject_order(values_df, taxa, r))) |>
     ggplot() +
-    geom_tile(aes(time, taxon, fill = value, col = value)) +
+    geom_tile(aes(time, taxon, fill = value, col = value), ...) +
     scale_x_continuous(expand = c(0, 0)) +
     scale_fill_distiller(direction = 1) +
     scale_color_distiller(direction = 1) +
