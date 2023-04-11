@@ -65,12 +65,9 @@ subject_data <- post.df |>
   filter(row_number() == 1)
 
 interventions <- samples |>
-  mutate(
-    birth = 1 * (time > -14 & time < 0),
-    long_term = 1 * (time > 0)
-  ) |>
+  mutate(birth = 1 * (time > -14 & time < 0)) |>
   ungroup() |>
-  select(sample, birth, long_term) |>
+  select(sample, birth) |>
   column_to_rownames("sample")
 ```
 
@@ -127,14 +124,22 @@ fit <- tr_fun(ts)
 ```
 
 ```{r}
-ws <- steps(c("birth" = TRUE, "long_term" = TRUE), lengths = 2:4, L = 4)
+ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
 staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 20)
 ```
 
-```{r}
-ggplot(staxa$ms)
-  geom_point(aes(taxon, m)) +
-  facet_wrap(~ lag, scales = "free_y")
+```{r, fig.height = 10, fig.width = 8}
+staxa$ms |>
+  mutate(
+    taxon = taxa(ts)[taxon],
+    lag = as.factor(lag)
+  ) |>
+  ggplot() +
+  geom_vline(xintercept = 0, size = 2, col = "#d3d3d3") +
+  geom_boxplot(aes(m, reorder(taxon, m), fill = lag, col = lag), alpha = 0.8) +
+  scale_fill_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  theme(axis.text.y = element_text(size = 14))
 ```
 
 ```{r}
@@ -150,11 +155,10 @@ for (i in 0:1) {
     map(~ replace_subject(., bc)) |>
     map(~ predict(fit, .))
 }
-
 ```
 
 ```{r}
-focus_taxa <- c("Bifidobacterium", "Lactobacillus", "L.crispatus", "L.iners", "Megasphaera", "Prevotella_6")
+focus_taxa <- c("Porphyromonas", "Lactobacillus", "Prevotella_6", "L.gasseri", "L.iners", "Atopobium")
 rdata <- sim_bc |>
   map_dfr(~ ribbon_data(.[[2]], .[[1]], focus_taxa, delta =  7), .id = "BC") |>
   mutate(
@@ -162,7 +166,13 @@ rdata <- sim_bc |>
     ) |>
   filter(time > -25, time < 80)
 
-ribbon_plot(rdata, group = "BC")
+pal <- c("#F2785C", "#144673")
+ribbon_plot(rdata, group = "BC") +
+  facet_wrap(~ reorder(taxon, median)) +
+  labs(y = expression(paste(Delta, " Abundance")), x = "Day", fill = "Birth Control Reinitiated", col = "Birth Control Reinitiated") +
+  scale_color_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  theme(axis.title = element_text(size = 12))
 ```
 
 ```{r}
@@ -172,7 +182,6 @@ subject_errors <- map_dfr(ts_hat - ts, ~ tibble(mse = mean(abs(values(.)))), .id
 ```
 
 ```{r, fig.height = 6, fig.width = 10}
-focus_taxa <- c("Lactobacillus", "L.jensenii", "L.gasseri", "Prevotella_6")
 quantiles <- quantile(subject_errors$mse, c(0.1, 0.9))
 values_df |>
   left_join(subject_errors) |>
@@ -180,28 +189,16 @@ values_df |>
   mutate(
     low_error = ifelse(mse < quantiles[1], "Small Residual", "Large Residual"),
     low_error = factor(low_error, levels = c("Small Residual", "Large Residual")),
-    taxon = factor(taxon, levels = c("Lactobacillus", "Prevotella_6", "L.gasseri", "L.jensenii"))
+    taxon = factor(taxon, levels = focus_taxa)
     ) |>
   ggplot() +
   geom_vline(xintercept = 0, col = "#d3d3d3", size = 2) +
   geom_line(aes(time, value, group = subject), alpha = 0.7, size = 0.4) +
-  facet_grid(taxon ~ low_error, scales = "free")
+  facet_grid(reorder(taxon, -value) ~ low_error, scales = "free") +
+  labs(y = "Abundance") +
+  theme(
+    strip.text.y = element_text(angle = 0, size = 12),
+    strip.text.x = element_text(size = 12),
+    axis.text = element_text(size = 8)
+  )
 ```
-
-
-* Fit model with birth event, birth control initiation
-* Select taxa that are significantly perturbed. Expect to see Bifido and Lacto
-* Compare the recovery trajectories for Bifido and Lacto
-* See whether the recovery trajectories are different across birth control initiation
-* See which women have the largest residuals and check whether it's consistent
-with the ones flagged in publication.
-
-
-
-
-
-
-
-
-
-
