@@ -68,16 +68,59 @@ interaction_barcode <- function(values_df, taxa, condition = NULL, r = 0, ...) {
   p
 }
 
-#' @importFrom ggplot2 theme_minimal theme
+#' @importFrom dplyr filter group_by summarise
 #' @export
-my_theme <- function() {
-  th <- theme_minimal() + 
-    theme(
-      panel.grid.minor = element_blank(),
-      panel.background = element_rect(fill = "#f7f7f7"),
-      panel.border = element_rect(fill = NA, color = "#0c0c0c", size = 0.6),
-      axis.text = element_text(size = 14),
-      axis.title = element_text(size = 16),
-      legend.position = "bottom"
+ribbon_data <- function(ts1, ts0, focus_taxa = NULL, delta = NULL) {
+  result <- (ts1 - ts0) |>
+    pivot_ts()
+    
+  if (!is.null(focus_taxa)) {
+    result <- filter(result, taxon %in% focus_taxa)
+  }
+  if (!is.null(delta)) {
+    result <- result |>
+      mutate(time = delta * round(time / delta))
+  }
+
+  result |>
+    group_by(taxon, time) |>
+    summarise(
+      q25 = quantile(value, 0.25),
+      median = median(value),
+      q75 = quantile(value, 0.75)
     )
+}
+
+#' @importFrom ggplot2 ggplot geom_ribbon aes geom_hline geom_line
+#'   scale_x_continuous theme facet_wrap
+#' @export
+ribbon_plot <- function(rdata, group = NULL, reorder_var = NULL) {
+  p <- ggplot(rdata, aes(x = time)) +
+    geom_hline(yintercept = 0, size = .25, col = "#787878") +
+    scale_x_continuous(expand = c(0, 0)) +
+    theme(axis.text = element_text(size = 8))
+  
+  # filled or grey ribbons
+  if (!is.null(group)) {
+    p <- p + 
+      geom_ribbon(aes(ymin = q25, ymax = q75, fill = .data[[group]], group = .data[[group]]), alpha = 0.6) +
+      geom_line(aes(y = median, col = .data[[group]], group = .data[[group]]), size = 1) +
+      scale_fill_brewer(palette = "Set2") +
+      scale_color_brewer(palette = "Set2")
+  } else {
+    p <- p + 
+      geom_ribbon(aes(ymin = q25, ymax = q75), fill = "#d3d3d3") +
+      geom_line(aes(y = median), col = "#8e8e8e", size = 1)
+  }
+  
+  # order facets (or not)
+  if (!is.null(reorder_var)) {
+    p <- p + 
+      facet_wrap(~ reorder(taxon, .data[[reorder_var]]), scales = "free_y")
+  } else if (n_distinct(rdata$taxon) > 1) {
+    p <- p +
+      facet_wrap(~ taxon, scales = "free_y")
+  }
+  
+  p
 }

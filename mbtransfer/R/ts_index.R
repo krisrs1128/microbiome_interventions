@@ -26,7 +26,7 @@ replace_inter <- function(ts, new_inter, start_ix = NULL) {
 #' @export
 replace_subject <- function(ts, new_subject) {
   subject <- subject_data(ts)
-  shared_cols <- intersect(colnames(subject), new_subject)
+  shared_cols <- intersect(colnames(subject), colnames(new_subject))
   subject[, shared_cols] <- new_subject
   subject_data(ts) <- subject
   ts

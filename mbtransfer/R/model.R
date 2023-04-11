@@ -60,7 +60,8 @@ model_predict_step <- function(ts_inter, fit, lags, subject = NULL) {
   }
 
   values(ts_inter) <- cbind(values(ts_inter), y_hat)
-  ts_inter@time <- c(ts_inter@time, max(ts_inter@time) + 1)
+  delta <- median(diff(ts_inter@time))
+  ts_inter@time <- c(ts_inter@time, max(ts_inter@time) + delta)
   ts_inter
 }
 

@@ -78,8 +78,11 @@ counterfactual_ts <- function(ts, w0, w1, start_ix = NULL) {
   if (is.null(start_ix)) {
     start_ix <- map_dbl(ts, ncol)
   }
+  for (i in seq_along(ts)) {
+    ts[[i]] <- ts[[i]][, seq_len(start_ix[i])]
+  }
 
-  ts0 <- replace_inter(ts[, seq_len(start_ix)], w0, start_ix)
-  ts1 <- replace_inter(ts[, seq_len(start_ix)], w1, start_ix)
+  ts0 <- replace_inter(ts, w0, start_ix)
+  ts1 <- replace_inter(ts, w1, start_ix)
   list(ts0 = ts0, ts1 = ts1)
 }

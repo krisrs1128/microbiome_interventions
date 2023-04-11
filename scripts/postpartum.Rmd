@@ -11,11 +11,10 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ```{r}
-library(RColorBrewer)
-library(ggh4x)
 library(fs)
 library(tidyverse)
 library(mbtransfer)
+library(glue)
 library(tfPaper)
 theme_set(my_theme())
 ```
@@ -29,56 +28,180 @@ load(root_dir / "data_post.RData")
 post.df <- post.df |>
   filter(PregOut != "Miscarriage", MonVsDel %in% -7:13, LibrarySize >= 4e4) |>
   group_by(SubjID) |>
-  filter(max(DayVsDel) > 4, n() > 4)
+  filter(
+    max(DayVsDel) > 4, 
+    n() > 20,
+    DayVsDel < 250,
+    DayVsDel > -100,
+  )
 
-sample_data <- post.df |>
-  rename(sample = SampleID, subject = SubjID, time = DayVsDel)
+samples <- post.df |>
+  rename(sample = SampleID, time = DayVsDel) |>
+  mutate(
+    condition = time > 0,
+    subject = glue("S{SubjID}"),
+    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
+  ) |>
+  ungroup() |>
+  select(-SubjID)
 
 reads <- post.df |>
   ungroup() |>
-  select(SampleID, Lactobacillus:L.other) |>
-  column_to_rownames("SampleID")
+  select(SampleID, LibrarySize, Lactobacillus:L.other) |>
+  column_to_rownames("SampleID") |>
+  mutate(across(Lactobacillus:L.other, ~ LibrarySize * .)) |>
+  select(-LibrarySize)
   
 subject_data <- post.df |>
   select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
   ungroup() |>
-  mutate(bmi_cut = cut(BmiPre, breaks = quantile(BmiPre, seq(0, 1, length.out = 4)))) |>
-  rename(subject = SubjID) |>
+  mutate(
+    bmi_cut = cut(BmiPre, breaks = quantile(BmiPre, seq(0, 1, length.out = 4))),
+    subject = glue("S{SubjID}"),
+    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
+  ) |>
+  select(-SubjID) |>
   group_by(subject) |>
   filter(row_number() == 1)
-```
 
-```{r}
-interventions <- sample_data |>
-  mutate(birth = 1 * (time > -14 & time < 0)) |>
+interventions <- samples |>
+  mutate(
+    birth = 1 * (time > -14 & time < 0),
+    long_term = 1 * (time > 0)
+  ) |>
   ungroup() |>
-  select(sample, birth) |>
+  select(sample, birth, long_term) |>
   column_to_rownames("sample")
 ```
 
 ```{r}
-sample_data |>
+samples |>
   left_join(interventions |> rownames_to_column("sample")) |>
   ggplot() +
   geom_point(aes(time, subject, col = birth))
 ```
 
 ```{r}
-ts <- ts_from_dfs(reads, interventions, sample_data, subject_data)
-ts_ <- interpolate(ts, delta = 14, method = "linear")
+metadata  <- samples |>
+  ungroup() |>
+  select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
+
+#ts <- reads |>
+#  normalize("mbImpute", metadata) |>
+#  ts_from_dfs(interventions, samples, subject_data) |>
+#  interpolate(delta = 14, method = "linear")
+ts <- readRDS("../data/ts-postpartium.rds")
 ```
 
-```{r}
-values_df <- pivot_ts(ts_)
+```{r, fig.width = 10, fig.height = 5}
+values_df <- pivot_ts(ts) |>
+  group_by(taxon) |>
+  mutate(value = rank(value) / n())
 
-taxa <- c("L.gasseri", "Lactobacillus", "Gardnerella")
-interaction_hm(values_df, taxa, "Race", -1)
-interaction_hm(values_df, taxa, "BirthControlYesNo", -1)
-interaction_hm(values_df, taxa, "bmi_cut", -1)
+taxa <- c("Lactobacillus", "Bifidobacterium", "Megasphaera")
+interaction_hm(values_df, taxa, "BirthControlYesNo", -1, width = 14) +
+  theme(axis.text.y = element_blank())
+interaction_hm(values_df, taxa, "bmi_cut", -1, width = 14) +
+  theme(axis.text.y = element_blank())
 ```
 
 ```{r, fig.height = 12, fig.width = 6}
-interaction_barcode(values_df, taxa, "Race")
-interaction_barcode(values_df, taxa, "BirthControlYesNo")
-interaction_barcode(values_df, taxa, "bmi_cut")
+interaction_barcode(values_df, taxa, "BirthControlYesNo", width = 14)
+interaction_barcode(values_df, taxa, "bmi_cut", width = 14)
 ```
+
+```{r}
+tr_fun <- function(x) {
+  mbtransfer(x, P = 3, Q = 3)
+}
+
+subject_data(ts) <- subject_data(ts) |>
+  select(subject, BirthControlYesNo) |>
+  mutate(
+    BCYes = 1 * (BirthControlYesNo == "Yes"),
+    BCNo = 1 * (BirthControlYesNo == "No")
+  ) |>
+  select(subject, starts_with("BC"))
+
+fit <- tr_fun(ts)
+```
+
+```{r}
+ws <- steps(c("birth" = TRUE, "long_term" = TRUE), lengths = 2:4, L = 4)
+staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 20)
+```
+
+```{r}
+ggplot(staxa$ms)
+  geom_point(aes(taxon, m)) +
+  facet_wrap(~ lag, scales = "free_y")
+```
+
+```{r}
+ws <- steps(c("birth" = TRUE), lengths = 2, L = 10)
+
+start_ix <- map_dbl(ts, ~ min(which(.@time >= -14))) - 1
+
+sim_bc <- list()
+for (i in 0:1) {
+  bc <- subject_data(ts) |>
+    mutate(BCYes = rep(i, n()), BCNo = rep(1 - i, n()))
+  sim_bc[[i + 1]] <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix) |>
+    map(~ replace_subject(., bc)) |>
+    map(~ predict(fit, .))
+}
+
+```
+
+```{r}
+focus_taxa <- c("Bifidobacterium", "Lactobacillus", "L.crispatus", "L.iners", "Megasphaera", "Prevotella_6")
+rdata <- sim_bc |>
+  map_dfr(~ ribbon_data(.[[2]], .[[1]], focus_taxa, delta =  7), .id = "BC") |>
+  mutate(
+    BC = fct_recode(BC, No = "1", Yes = "2")
+    ) |>
+  filter(time > -25, time < 80)
+
+ribbon_plot(rdata, group = "BC")
+```
+
+```{r}
+ts_missing <- subset_values(ts, 1:6)
+ts_hat <- predict(fit, ts_missing)
+subject_errors <- map_dfr(ts_hat - ts, ~ tibble(mse = mean(abs(values(.)))), .id = "subject")
+```
+
+```{r, fig.height = 6, fig.width = 10}
+focus_taxa <- c("Lactobacillus", "L.jensenii", "L.gasseri", "Prevotella_6")
+quantiles <- quantile(subject_errors$mse, c(0.1, 0.9))
+values_df |>
+  left_join(subject_errors) |>
+  filter(taxon %in% focus_taxa, mse > quantiles[2] | mse < quantiles[1]) |>
+  mutate(
+    low_error = ifelse(mse < quantiles[1], "Small Residual", "Large Residual"),
+    low_error = factor(low_error, levels = c("Small Residual", "Large Residual")),
+    taxon = factor(taxon, levels = c("Lactobacillus", "Prevotella_6", "L.gasseri", "L.jensenii"))
+    ) |>
+  ggplot() +
+  geom_vline(xintercept = 0, col = "#d3d3d3", size = 2) +
+  geom_line(aes(time, value, group = subject), alpha = 0.7, size = 0.4) +
+  facet_grid(taxon ~ low_error, scales = "free")
+```
+
+
+* Fit model with birth event, birth control initiation
+* Select taxa that are significantly perturbed. Expect to see Bifido and Lacto
+* Compare the recovery trajectories for Bifido and Lacto
+* See whether the recovery trajectories are different across birth control initiation
+* See which women have the largest residuals and check whether it's consistent
+with the ones flagged in publication.
+
+
+
+
+
+
+
+
+
+
