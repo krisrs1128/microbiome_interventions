@@ -38,15 +38,14 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   } else if (method == "mbImpute") {
     condition <- pull(metadata, condition)
     metadata <- select(metadata, -condition:-sample)
-    if (any(apply(metadata, 2, type) %in% c("factor", "character"))) {
-      metadata <- model.matrix(~ -1 + . , metadata)
+    if (any(apply(metadata, 2, class) %in% c("factor", "character"))) {
+      metadata <- model.matrix(~ . , metadata)[, -1]
     }
 
-    n_cores <- detectCores()
     if (ncol(metadata) > 0) {
-      result <- mbImpute(condition, reads, metadata, ncores = n_cores, parallel = TRUE, ...)$imp_count_mat_lognorm
+      result <- mbImpute(condition, reads, metadata, ncores = detectCores(), parallel = TRUE, ...)$imp_count_mat_lognorm
     } else {
-      result <- mbImpute(condition, reads, ncores = n_cores, parallel = TRUE, ...)$imp_count_mat_lognorm
+      result <- mbImpute(condition, reads, ncores = detectCores(), parallel = TRUE, ...)$imp_count_mat_lognorm
     }
   }
 
