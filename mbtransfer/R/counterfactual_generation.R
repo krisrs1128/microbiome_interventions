@@ -77,7 +77,10 @@ pulses <- function(p_states, lags = 1, L = 3, w_star = c(0, 1)) {
 counterfactual_ts <- function(ts, w0, w1, start_ix = NULL) {
   if (is.null(start_ix)) {
     start_ix <- map_dbl(ts, ncol)
+  } else if (length(start_ix) == 1) {
+    start_ix <- rep(start_ix, length(ts))
   }
+  
   for (i in seq_along(ts)) {
     ts[[i]] <- ts[[i]][, seq_len(start_ix[i])]
   }
