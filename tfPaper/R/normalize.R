@@ -1,6 +1,28 @@
 
 #' @importFrom phyloseq phyloseq otu_table sample_data phyloseq_to_deseq2
 #' @importFrom DESeq2 sizeFactors estimateSizeFactors
+deseq_normalize <- function(reads, metadata) {
+  # construct design for DESeq2 object
+  if (is.null(metadata)) {
+    fmla <- formula(~ 1)
+  } else {
+    fmla <- formula(~ condition)
+  }
+  
+  # construct phyloseq and perform normalization
+  metadata <- metadata |>
+    column_to_rownames("sample") |>
+    sample_data()
+  ps <- phyloseq(
+    otu_table(reads, taxa_are_rows = FALSE),
+    metadata
+  )
+  
+  dds <- phyloseq_to_deseq2(ps, fmla)
+  size_factors <- sizeFactors(estimateSizeFactors(dds, "poscounts"))
+  reads / size_factors
+}
+
 #' @importFrom mbImpute mbImpute
 #' @importFrom parallel detectCores
 #' @export
@@ -12,27 +34,7 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
   if (method == "none") {
     result <- reads
   } else if (method == "DESeq2") {
-
-    # construct design for DESeq2 object
-    if (is.null(metadata)) {
-      fmla <- formula(~ 1)
-    } else {
-      fmla <- formula(~ condition)
-    }
-
-    # construct phyloseq and perform normalization
-    metadata <- metadata |>
-      column_to_rownames("sample") |>
-      sample_data()
-    ps <- phyloseq(
-      otu_table(reads, taxa_are_rows = FALSE),
-      metadata
-    )
-    
-    dds <- phyloseq_to_deseq2(ps, fmla)
-    size_factors <- sizeFactors(estimateSizeFactors(dds, "poscounts"))
-    result <- reads / size_factors
-
+    result <- deseq_normalize(reads, metadata)
   } else if (method == "relative_abundance") {
     result <- reads / rowSums(reads)
   } else if (method == "mbImpute") {
@@ -47,6 +49,8 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
     } else {
       result <- mbImpute(condition, reads, ncores = detectCores(), parallel = TRUE, ...)$imp_count_mat_lognorm
     }
+  } else if (method == "DESeq2-asinh") {
+    result <- asinh(deseq_normalize(reads, metadata))
   }
 
   result
