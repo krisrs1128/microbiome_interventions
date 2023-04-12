@@ -31,7 +31,9 @@ ts_from_dfs <- function(reads, interventions, metadata, subject_data = NULL) {
       left_join(subject_data)
   }
   
-  new("ts_inter", series = series, subject_data = subject_data)
+  ts <- new("ts_inter", series = series, subject_data = subject_data)
+  names(ts) <- subjects
+  ts
 }
 
 #' @export

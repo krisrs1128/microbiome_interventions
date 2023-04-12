@@ -13,8 +13,7 @@ method_configurations <- function(data_paths) {
     mutate(
       hyper = list(list(P = 2, Q = 2), list(P = 4, Q = 4))[hyper],
       output_path = glue("result-{str_pad(row_number(), 3, 'left', '0')}.rda")
-    ) |>
-    filter(!(normalization == "mbImpute" & method == "mdsine"))
+    )
 }
 
 #' @importFrom dplyr mutate

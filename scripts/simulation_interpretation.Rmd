@@ -49,9 +49,7 @@ metadata <- paths |>
 metrics <- paths |>
   path_filter("*forecasting*") |>
   map_dfr(~ { load(.); metrics }, .id = "full_path")
-```
 
-```{r}
 computation <- paths |>
   path_filter("*forecasting*") |>
   map_dfr(~ { load(.); tibble(time_diff = time_diff) }, .id = "full_path")
@@ -72,7 +70,7 @@ metrics <- metrics |>
 
 ggplot(metrics) +
   geom_boxplot(aes(interaction(n_subject, n_time), mae, fill = method)) +
-  facet_wrap( ~ normalization) +
+  facet_wrap( ~ normalization, scale = "free_y") +
   scale_y_sqrt()
 ```
 

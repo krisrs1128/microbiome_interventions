@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  run_id: 7
+  run_id: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -102,13 +102,13 @@ reads <- t(reads)
 ```{r}
 subject_data <- z |>
   as_tibble() |>
-  mutate(subject = row_number())
+  mutate(subject = as.character(glue("S{row_number()}")))
 
 metadata <- expand.grid(
     time = seq_len(n_time),
-    subject = seq_len(n_subject)
+    subject = as.character(glue("S{seq_len(n_subject)}"))
   ) |>
-  mutate(sample = str_c("sam", row_number())) |>
+  mutate(sample = as.character(glue("sam{row_number()}"))) |>
   filter(time > n_lag) |>
   mutate(time = time - n_time / 2)
 

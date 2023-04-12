@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 3
+  run_id: 24
 ---
 
 ```{r setup, include=FALSE}
@@ -20,7 +20,7 @@ library(tidyverse)
 library(mbtransfer)
 library(mdsine)
 library(tfPaper)
-set.seed(20230325)
+set.seed(20230412)
 ```
 
 ```{r configurations}
