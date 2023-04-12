@@ -67,7 +67,7 @@ samples <- samples |>
 
 ```{r}
 ts <- reads |>
-  normalize("mbImpute", samples) |>
+  normalize("DESeq2-asinh", samples) |>
   ts_from_dfs(interventions, samples, subject) |>
   interpolate(method = "linear")
 values_df <- pivot_ts(ts)
@@ -83,7 +83,7 @@ top_taxa <- values_df |>
 values_df |>
   group_by(taxon) |>
   mutate(value = rank(value) / n()) |>
-  interaction_hm(subject, top_taxa, "diet")
+  interaction_hm(top_taxa, "diet")
 ```
 
 ### Cross Validation
@@ -142,38 +142,22 @@ staxa <- select_taxa(ts, ws[[1]], ws[[8]], tr_fun, n_splits = 20)
 #staxa <- readRDS("../data/staxa-diet.rds")
 ```
 
-```{r}
-ggplot(staxa$ms) +
-  geom_point(aes(taxon, m)) +
-  facet_wrap(~ lag, scales = "free_y")
+```{r, fig.height = 6, fig.width = 3}
+staxa$ms |>
+  mutate(
+    taxon = taxa(ts)[taxon],
+    lag = as.factor(lag)
+  ) |>
+  ggplot() +
+  geom_vline(xintercept = 0, size = 2, col = "#d3d3d3") +
+  geom_boxplot(aes(m, reorder(taxon, m), fill = lag, col = lag), alpha = 0.8) +
+  scale_fill_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  theme(axis.text.y = element_text(size = 14))
 ```
 
 ```{r}
 focus_taxa <- unlist(map(staxa$taxa, ~ c(.)))
-
-focus_m <- staxa$ms |>
-  mutate(taxon = taxa(ts)[taxon]) |>
-  filter(taxon %in% focus_taxa) |>
-  group_by(taxon, lag) |>
-  summarise(m = mean(m)) |> 
-  group_by(taxon) |>
-  mutate(m = m / max(abs(m)))
-  
-focus_m_wide <- focus_m |>
-  pivot_wider(names_from = lag, values_from = m) |>
-  ungroup()
-
-focus_m <- focus_m_wide |>
-  select(-taxon) %>%
-  recipe(~ ., data = .) |>
-  step_pca() |>
-  prep() |>
-  juice() |>
-  mutate(taxon = focus_m_wide$taxon) |>
-  right_join(focus_m)
-
-ggplot(focus_m) +
-  geom_line(aes(lag, m, group = taxon, col = `2`))
 ```
 
 * Get m's for the taxa within the selected set X
@@ -189,30 +173,29 @@ sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[8]], start_ix = 4) |>
   map(~ predict(fit, .))
 ```
 
-```{r}
-ribbon_data <- (sim_ts[[2]] - sim_ts[[1]]) |>
-  pivot_ts() |>
-  filter(taxon %in% focus_taxa) |>
-  group_by(taxon, time) |>
-  summarise(
-    q25 = quantile(value, 0.25),
-    median = median(value),
-    q75 = quantile(value, 0.75)
-  ) |>
-  left_join(focus_m)
+```{r, fig.height = 4, fig.width = 6}
+rdata <- ribbon_data(sim_ts[[2]], sim_ts[[1]], focus_taxa)
+
+rdata_wide <- rdata |>
+  select(taxon, time, median) |>
+  filter(time > 0) |>
+  pivot_wider(names_from = time, values_from = median)
+
+rdata_order <- rdata_wide |>
+  select(-taxon) %>%
+  recipe(~ ., data = .) |>
+  step_pca() |>
+  prep() |>
+  juice() |>
+  mutate(taxon = rdata_wide$taxon)
+
+  
+rdata |>
+  left_join(rdata_order) |>
+  ribbon_plot(reorder_var = "1")
 ```
 
-```{r, fig.height = 7, fig.width = 10}
-ggplot(ribbon_data, aes(x = time)) +
-  geom_ribbon(aes(ymin = q25, ymax = q75), fill = "#d3d3d3") +
-  geom_hline(yintercept = 0, size = .25, col = "#787878") +
-  geom_line(aes(y = median), col = "#8e8e8e", size = 1) +
-  scale_x_continuous(expand = c(0, 0), limits = c(0, 8)) +
-  facet_wrap(~ reorder(taxon, `2`), scales = "free_y") +
-  theme(axis.text = element_text(size = 8))
-```
-
-```{r, fig.height = 5, fig.width = 10}
+```{r, fig.height = 2.5, fig.width = 6}
 values_df |>
   filter(diet == "Animal") |>
   group_by(taxon) |>
