@@ -43,34 +43,99 @@ tau_q <- function(fdp, q) {
 }
 ```
 
+```{r}
+N <- 500
+P <- 250
+S0 <- 50
+b <- 3
+x <- scale(matrix(rnorm(N * P), N, P)) / sqrt(P)
+beta <- c(rep(b, S0), rep(0, P - S0))
+y <- x %*% beta + rnorm(N)
+
+xy <- cbind(y, x[, c(1:2, (S0 + 1):(S0 + 2))]) |>
+  as_tibble() |>
+  rownames_to_column("sample") |>
+  mutate(split = row_number() %in% ix) |>
+  pivot_longer(V2:V5)
+
+ggplot(xy, aes(value, V1)) +
+  geom_hline(yintercept = 0, col = "#d3d3d3", size = 2) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  stat_smooth(method = "lm", se = FALSE) +
+  coord_fixed(0.02) +
+  facet_wrap(~ name)
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/scatter_mirror_toy.png")
+
+pal <- c("#6F96A6", "#684F8C")
+ix <- sample(nrow(x), nrow(x) / 2)
+ggplot(xy, aes(value, V1, col = split)) +
+  geom_hline(yintercept = 0, col = "#d3d3d3", size = 2) +
+  scale_color_manual(values = pal) +
+  geom_point(size = 0.5, alpha = 0.6) +
+  stat_smooth(method = "lm", se = FALSE) +
+  coord_fixed(0.02) +
+  facet_wrap(~ name) +
+  theme(legend.position = "bottom")
+
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/scatter_mirror_toy_col.png")
+```
+
+```{r}
+library(glmnet)
+fits <- list(
+  glmnet(x[ix, ], y[ix], alpha = .1, lambda = .05),
+  glmnet(x[-ix, ], y[-ix], alpha = .1, lambda = .05)
+)
+
+b_splits <- map_dfr(
+  fits, ~ {
+    b <- as.matrix(coef(.))
+    b_df <- data.frame(b = b[, 1])
+    b_df$term <- rownames(b)
+    b_df
+  }
+  , .id = "split")
+
+pal <- c("#6F96A6", "#684F8C")
+ggplot(b_splits) +
+  geom_point(aes(reorder(term, -abs(b)), b, col = split)) +
+  labs(y = expression(hat(beta[j])), x = "Sorted Features") +
+  scale_color_manual(values = pal) +
+  theme(
+    axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+    panel.grid = element_blank()
+  )
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/mirror_betas.png", width = 8, height = 4)
+```
 
 Here are some idealized mirror statistics.
 
 ```{r}
-n0 <- 800
-n1 <- 200
-
-
-m <- sample_m(n0, n1)
+library(glue)
+m <- b_splits |>
+  pivot_wider(names_from = split, values_from = b) |>
+  mutate(
+    m = sign(`1` * `2`) * (`1` + `2`),
+    nonnull = term %in% glue("V{1:S0}")
+  )
 
 ggplot(m) +
-  geom_histogram(
-    aes(m, fill = nonnull), 
-    bins = 50,
-    alpha = 0.8, position = "identity"
-  )
+  geom_histogram(aes(m, fill = nonnull), position = "identity", alpha = 0.6) +
+  scale_fill_manual(values = pal)
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/mirror_histogram.png", width = 8, height = 6)
 ```
 
 We can compute an FDR estimator from them.
 
 ```{r}
 fdp <- fdp_hat(m$m)
-tau <- tau_q(fdp, 0.1)
+tau <- tau_q(fdp, 0.2)
 
 ggplot(fdp) +
   geom_point(aes(t, fdp)) +
   geom_vline(xintercept = tau) +
-  geom_hline(yintercept = 0.1)
+  geom_hline(yintercept = 0.2)
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/fdp_hat.png", width = 8, height = 6)
 ```
 
 ```{r}
