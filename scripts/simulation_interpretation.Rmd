@@ -59,19 +59,44 @@ computation <- paths |>
 computation |>
   left_join(metadata) |>
   ggplot() +
-  geom_point(aes(normalization, time_diff, col = as.factor(n_subject)))
+  geom_boxplot(aes(normalization, as.numeric(time_diff), col = factor(method), fill = factor(method)), alpha = 0.6) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  scale_y_log10() +
+  labs(y = "Mintes") +
+  facet_wrap(~ method) +
+  theme(strip.text = element_text(size = 16))
+```
+```{r}
+head(metrics)
 ```
 
-```{r}
+```{r, fig.width = 12, fig.height = 6}
 metrics <- metrics |>
-  select(full_path, matches("mse|mae")) |>
   left_join(metadata) |>
   unnest_wider("hyper")
 
-ggplot(metrics) +
-  geom_boxplot(aes(interaction(n_subject, n_time), mae, fill = method)) +
-  facet_wrap( ~ normalization, scale = "free_y") +
-  scale_y_sqrt()
+metrics |>
+  mutate(
+    n_taxa = glue("{n_taxa} taxa"),
+    prop_nonnull = glue("{100 * prop_nonnull}% nonnull"),
+    P = ifelse(is.na(P), "", as.character(P)),
+    signal_B = glue("b = {signal_B}")
+  ) |>
+  ggplot() +
+  geom_boxplot(aes(normalization, mae, fill = interaction(factor(method), P), col = interaction(factor(method), P)), alpha = 0.5) +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Set1") +
+  facet_wrap(prop_nonnull ~ signal_B) +
+  labs(x = "Normalization", y = "Mean Absolute Error (H = 1,..,5)", col = "Method", fill = "Method", title = "50 Taxa") +
+  scale_y_sqrt(limits = c(0, 500)) +
+  theme(
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    title = element_text(size = 20)
+  )
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/forecasting-sim-error.png", height = 6, width = 12)
 ```
 
 ### Inferential Results
@@ -79,29 +104,43 @@ ggplot(metrics) +
 ```{r}
 inference_config <- configurations |>
   filter(map_lgl(hyper, ~ !is.null(.$P) > 0 && .$P == 2)) |>
-  mutate(output_path = glue("inference-{str_pad(row_number(), 3, 'left', '0')}.rda"))
+  mutate(output_path = glue("inference-{str_pad(row_number(), 3, 'left', '0')}.rda")) |>
+  select(-method)
 
 testing_results <- paths |>
   path_filter("*inference*") |>
   map_dfr(~ { load(.); testing_results }, .id = "full_path") |>
   mutate(output_path = path_file(full_path)) |>
-  select(-method) |> # forecasting method != inference method
   left_join(inference_config)
 ```
 
 ```{r}
+pal <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
 testing_results |>
   filter(type == "marginal") |>
+  mutate(
+    prop_nonnull = glue("{100 * prop_nonnull}% nonnull"),
+    signal_B = glue("b = {signal_B}")
+  ) |>
   ggplot() +
   geom_vline(xintercept = 0.2, col = "#898989", size = 1) +
-  geom_point(aes(fdp, power, col = normalization), size = 3) +
-  scale_color_manual(values = c("#048ABF", "#F2CB05")) +
-  facet_wrap(~ method)
+  geom_point(aes(fdp, power, shape = signal_B, col = lag), size = 3) +
+  scale_color_manual(values = pal) +
+  facet_grid(normalization ~ method + prop_nonnull) +
+  labs(x = "False Discovery Proportion", y = "Power", col = "Lag") +
+  theme(
+    axis.text = element_text(size = 10),
+    strip.text = element_text(size = 14),
+    strip.text.y = element_text(angle = 0, size = 14),
+    panel.spacing = unit(0.1, "line")
+  )
 
-testing_results |>
-  filter(type == "interaction") |>
-  ggplot() +
-  geom_boxplot(aes(method, power, fill = normalization, col = normalization), alpha = 0.3) +
-  scale_fill_manual(values = c("#048ABF", "#F2CB05")) +
-  scale_color_manual(values = c("#048ABF", "#F2CB05"))
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/inference-sim-error.png", height = 5, width = 10)
+
+summary_table <- testing_results |>
+  filter(type == "marginal") |>
+  group_by(method, normalization, lag, prop_nonnull, signal_B) |>
+  summarise(FDP = round(mean(fdp), 3))
+
+write_csv(summary_table, "~/Desktop/laboratory/talks/2023/20230414/figures/summary_table_fdp.csv")
 ```

@@ -30,9 +30,7 @@ post.df <- post.df |>
   group_by(SubjID) |>
   filter(
     max(DayVsDel) > 4, 
-    n() > 20,
-    DayVsDel < 250,
-    DayVsDel > -100,
+    n() > 20
   )
 
 samples <- post.df |>
@@ -83,22 +81,12 @@ metadata  <- samples |>
   ungroup() |>
   select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
 
+save(metadata, reads, samples, subject_data, interventions, file = "~/Downloads/postpartum_setup.rda")
+
 ts <- reads |>
  normalize("DESeq2-asinh", metadata) |>
  ts_from_dfs(interventions, samples, subject_data) |>
  interpolate(delta = 14, method = "linear")
-```
-
-```{r, fig.width = 10, fig.height = 5}
-values_df <- pivot_ts(ts) |>
-  group_by(taxon) |>
-  mutate(value = rank(value) / n())
-
-taxa <- c("Lactobacillus", "Bifidobacterium", "Megasphaera")
-interaction_hm(values_df, taxa, "BirthControlYesNo", -1, width = 14) +
-  theme(axis.text.y = element_blank())
-interaction_hm(values_df, taxa, "bmi_cut", -1, width = 14) +
-  theme(axis.text.y = element_blank())
 ```
 
 ```{r, fig.height = 12, fig.width = 6}
@@ -131,14 +119,19 @@ staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 20)
 staxa$ms |>
   mutate(
     taxon = taxa(ts)[taxon],
-    lag = as.factor(lag)
+    lag = as.factor(lag),
+    selected = ifelse(taxon %in% unlist(staxa$taxa), "Selected", "Not Selected")
   ) |>
   ggplot() +
-  geom_vline(xintercept = 0, size = 2, col = "#d3d3d3") +
-  geom_boxplot(aes(m, reorder(taxon, m), fill = lag, col = lag), alpha = 0.8) +
+  geom_hline(yintercept = 0, size = 2, col = "#d3d3d3") +
+  geom_boxplot(aes(reorder(taxon, -m), m, fill = lag, col = lag), alpha = 0.8) +
+  facet_grid(. ~ selected, scales = "free_x", space = "free_x") +
   scale_fill_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
   scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
-  theme(axis.text.y = element_text(size = 14))
+  labs(y = expression(M[j]), x = "Taxon") +
+  theme(axis.text.x = element_text(angle = 90, size = 11))
+
+#ggsave("~/Downloads/postpartum-mirror.png", height = 5, width = 10)
 ```
 
 ```{r}
@@ -170,7 +163,12 @@ ribbon_plot(rdata, group = "BC") +
   labs(y = expression(paste(Delta, " Abundance")), x = "Day", fill = "Birth Control Reinitiated", col = "Birth Control Reinitiated") +
   scale_color_manual(values = pal) +
   scale_fill_manual(values = pal) +
-  theme(axis.title = element_text(size = 12))
+  theme(
+    axis.title = element_text(size = 12), 
+    strip.text = element_text(size = 12)
+  )
+
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/counterfactual_postpartum_staxa.png", width = 9, height = 4.5)
 ```
 
 ```{r}
@@ -193,10 +191,27 @@ values_df |>
   geom_vline(xintercept = 0, col = "#d3d3d3", size = 2) +
   geom_line(aes(time, value, group = subject), alpha = 0.7, size = 0.4) +
   facet_grid(reorder(taxon, -value) ~ low_error, scales = "free") +
+  scale_x_continuous(expand = c(0, 0)) +
   labs(y = "Abundance") +
   theme(
     strip.text.y = element_text(angle = 0, size = 12),
     strip.text.x = element_text(size = 12),
     axis.text = element_text(size = 8)
   )
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/residual_postpartum.png", width = 10, height = 6)
+```
+
+```{r, fig.width = 10, fig.height = 5}
+values_df <- pivot_ts(ts) |>
+  group_by(taxon) |>
+  mutate(value = rank(value) / n()) |>
+  left_join(subject_data)
+
+vis_taxa <- c("Lactobacillus", "L.iners", "Porphyromonas", "Prevotella_6")
+interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
+  theme(
+    axis.text.y = element_blank(),
+    strip.text = element_text(size = 12)
+  )
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```

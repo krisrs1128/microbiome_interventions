@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  run_id: 3
+  run_id: 7
 ---
 
 ```{r setup, include=FALSE}
@@ -141,7 +141,7 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 ```
 
 ```{r}
-save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+#save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
 ```{r, eval = FALSE}
@@ -155,10 +155,18 @@ values_df <- data.frame(reads) |>
   left_join(rownames_to_column(data.frame(interventions), "sample"))
   
 ggplot(values_df, aes(time, reorder(subject, value))) +
-  geom_tile(aes(fill = value, col = as.factor(P1)), size = .1) +
+  geom_tile(aes(fill = value, col = as.factor(P1)), size = .3) +
   scale_fill_distiller(direction = 1) +
   facet_wrap(~ taxon) +
-  scale_color_manual(values = c("white", "red"))
+  labs(x = "Time", y = "Subject") +
+  scale_color_manual(values = c("#F2E8DF", "#BF0426")) +
+  scale_x_continuous(expand = c(0, 0)) +
+  theme(
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank()
+  )
+
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/simulation-hm.png", width = 10, height = 6)
 ```
 
 ```{r, eval = FALSE}
