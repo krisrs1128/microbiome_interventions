@@ -11,4 +11,4 @@ request_cpus = 1
 request_memory = 18GB
 request_disk = 6GB
 requirements = (Target.HasCHTCStaging == true)
-queue 54
+queue 122
