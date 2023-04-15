@@ -58,15 +58,22 @@ computation <- paths |>
 ```{r}
 computation |>
   left_join(metadata) |>
+  unnest_wider(hyper) |>
+  mutate(
+    time_diff = as.numeric(time_diff) / 60,
+    P = ifelse(is.na(P), "", as.character(P)),
+  ) |>
   ggplot() +
-  geom_boxplot(aes(normalization, as.numeric(time_diff), col = factor(method), fill = factor(method)), alpha = 0.6) +
+  geom_boxplot(aes(normalization, time_diff, col = interaction(method, P), fill = interaction(method, P)), alpha = 0.6) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
   scale_y_log10() +
-  labs(y = "Mintes") +
+  labs(y = "Minutes", col = "Method", fill = "Method") +
   facet_wrap(~ method) +
   theme(strip.text = element_text(size = 16))
+ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/computation-sim.png", width = 8, height = 4)
 ```
+
 ```{r}
 head(metrics)
 ```
@@ -135,12 +142,12 @@ testing_results |>
     panel.spacing = unit(0.1, "line")
   )
 
-ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/inference-sim-error.png", height = 5, width = 10)
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/inference-sim-error.png", height = 5, width = 10)
 
 summary_table <- testing_results |>
   filter(type == "marginal") |>
   group_by(method, normalization, lag, prop_nonnull, signal_B) |>
   summarise(FDP = round(mean(fdp), 3))
 
-write_csv(summary_table, "~/Desktop/laboratory/talks/2023/20230414/figures/summary_table_fdp.csv")
+#write_csv(summary_table, "~/Desktop/laboratory/talks/2023/20230414/figures/summary_table_fdp.csv")
 ```

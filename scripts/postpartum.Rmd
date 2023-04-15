@@ -81,8 +81,6 @@ metadata  <- samples |>
   ungroup() |>
   select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
 
-save(metadata, reads, samples, subject_data, interventions, file = "~/Downloads/postpartum_setup.rda")
-
 ts <- reads |>
  normalize("DESeq2-asinh", metadata) |>
  ts_from_dfs(interventions, samples, subject_data) |>
@@ -213,5 +211,6 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
     axis.text.y = element_blank(),
     strip.text = element_text(size = 12)
   )
-ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
+ggsave("~/Downloads/cover.png", dpi = 1000, width = 10, height = 4)
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```

@@ -141,7 +141,7 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 ```
 
 ```{r}
-#save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
 ```{r, eval = FALSE}
@@ -166,13 +166,13 @@ ggplot(values_df, aes(time, reorder(subject, value))) +
     axis.text.y = element_blank()
   )
 
-ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/simulation-hm.png", width = 10, height = 6)
+#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/simulation-hm.png", width = 10, height = 6)
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(36)){
+for (i in seq_len(81)){
   if (i %% 5 == 0) {
-    print(glue::glue("{i}/36"))
+    print(glue::glue("{i}/81"))
   }
   rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
 }
