@@ -51,6 +51,7 @@ b <- 3
 x <- scale(matrix(rnorm(N * P), N, P)) / sqrt(P)
 beta <- c(rep(b, S0), rep(0, P - S0))
 y <- x %*% beta + rnorm(N)
+ix <- sample(nrow(x), nrow(x) / 2)
 
 xy <- cbind(y, x[, c(1:2, (S0 + 1):(S0 + 2))]) |>
   as_tibble() |>
@@ -67,7 +68,6 @@ ggplot(xy, aes(value, V1)) +
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/scatter_mirror_toy.png")
 
 pal <- c("#6F96A6", "#684F8C")
-ix <- sample(nrow(x), nrow(x) / 2)
 ggplot(xy, aes(value, V1, col = split)) +
   geom_hline(yintercept = 0, col = "#d3d3d3", size = 2) +
   scale_color_manual(values = pal) +
@@ -75,7 +75,7 @@ ggplot(xy, aes(value, V1, col = split)) +
   stat_smooth(method = "lm", se = FALSE) +
   coord_fixed(0.02) +
   facet_wrap(~ name) +
-  theme(legend.position = "bottom")
+  theme(legend.position = "non")
 
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/scatter_mirror_toy_col.png")
 ```
@@ -99,10 +99,12 @@ b_splits <- map_dfr(
 pal <- c("#6F96A6", "#684F8C")
 ggplot(b_splits) +
   geom_point(aes(reorder(term, -abs(b)), b, col = split)) +
-  labs(y = expression(hat(beta[j])), x = "Sorted Features") +
+  labs(y = expression(hat(beta[j])^{(s)}), x = "Sorted Features") +
   scale_color_manual(values = pal) +
   theme(
-    axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title = element_text(size = 16),
     panel.grid = element_blank()
   )
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/mirror_betas.png", width = 8, height = 4)
@@ -121,7 +123,14 @@ m <- b_splits |>
 
 ggplot(m) +
   geom_histogram(aes(m, fill = nonnull), position = "identity", alpha = 0.6) +
-  scale_fill_manual(values = pal)
+  scale_fill_manual(values = pal) +
+  labs(x = expression(M[j]), y = "Count") +
+  theme(
+    axis.text = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 16),
+    axis.title = element_text(size = 20)
+  )
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/mirror_histogram.png", width = 8, height = 6)
 ```
 
@@ -134,7 +143,15 @@ tau <- tau_q(fdp, 0.2)
 ggplot(fdp) +
   geom_point(aes(t, fdp)) +
   geom_vline(xintercept = tau) +
-  geom_hline(yintercept = 0.2)
+  geom_hline(yintercept = 0.2) +
+  labs(x = expression(t), y = expression(widehat(FDP)(t))) +
+  theme(
+    axis.text = element_text(size = 14),
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 16),
+    axis.title = element_text(size = 20)
+  )
+  
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/fdp_hat.png", width = 8, height = 6)
 ```
 

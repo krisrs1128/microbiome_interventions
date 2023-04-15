@@ -19,7 +19,7 @@ to_vector <- function(x) {
 steps <- function(p_states, starts = 1, lengths = 1:3, L = 3, w_star = c(0, 1)) {
   w0 <- matrix(0, nrow = length(p_states), ncol = L)
   rownames(w0) <- names(p_states)
-  colnames(w0) <- glue("yhat_{seq_len(ncol(w0))}")
+  colnames(w0) <- glue("t{seq_len(ncol(w0))}")
   starts <- to_vector(starts)
   lengths <- to_vector(lengths)
   active_p <- names(p_states[p_states])
