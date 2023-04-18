@@ -72,12 +72,17 @@ forward_simulate <- function(object, newdata, dt=0.25) {
 
       # input results to the original ts_inter object
       series_i <- newdata[[i]]
+      times <- split_data$pre@time
+      series_i@time <- c(times, seq(max(times) + 1, max(times) + n_future))
       values(series_i) <- cbind(values(series_i), y_hat)
-
+      colnames(values(series_i)) <- colnames(interventions(series_i))
     }
     series[[i]] <- series_i
   }
-  new("ts_inter", series = series)
+
+  ts <- new("ts_inter", series = series)
+  names(ts) <- names(newdata)
+  ts
 }
 
 perturbation_intervals <- function(ts_inter) {
