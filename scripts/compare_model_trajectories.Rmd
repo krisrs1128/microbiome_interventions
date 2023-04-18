@@ -1,0 +1,133 @@
+---
+title: "Untitled"
+output: 
+  html_document:
+    highlight: "kate"
+params:
+  outputs_dir: "tf_sim/"
+  outputs_filter: "*rda"
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(glue)
+library(fs)
+library(tidyverse)
+library(tfPaper)
+library(mbtransfer)
+library(mdsine)
+theme_set(my_theme())
+set.seed(20230417)
+```
+
+Comparison in MDSINE vs. mbtransfer predictions.
+
+```{r}
+paths <- dir_ls(params$outputs_dir, recurse = TRUE) |>
+  path_filter(regexp=params$outputs_filter)
+
+load(paths[str_detect(paths, "sim_input_001")])
+interventions_df <- data.frame(interventions) |>
+  rownames_to_column("sample")
+metadata <- metadata |>
+  left_join(interventions_df) |>
+  rename(condition = P1)
+reads[reads > .Machine$integer.max] <- .Machine$integer.max - 1
+
+ts <- reads |>
+  normalize("none", metadata) |>
+  ts_from_dfs(interventions, metadata, subject_data) |>
+  interpolate()
+
+hyper <- list(taxonomy = taxonomy)
+```
+
+```{r configurations}
+configurations <- str_detect(paths, "sim_input") |>
+  path_abs() |>
+  method_configurations() |>
+  mutate(data_path_base = basename(as.character(data_path)))
+
+data_config <- data_parameters() |>
+  mutate(data_path_base = basename(output_path)) |>
+  select(-output_path)
+
+configurations <- configurations |>
+  left_join(data_config) |>
+  filter(!(method == "mdsine" & n_taxa > 100))
+```
+
+```{r}
+cvs <- list()
+set.seed(123)
+cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, hyper$taxonomy), K = 4)
+set.seed(123)
+cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4)
+saveRDS(cvs, "../data/compare-trajectories.rds")
+#cvs <- readRDS("../data/compare-trajectories.rds")
+```
+
+### Visualize the Differences
+
+```{r}
+metrics <- map_dfr(cvs, ~ .$metrics, .id =  "method")
+
+ggplot(metrics) +
+  geom_boxplot(aes(lag, fill = method, col = method, mae), alpha = 0.6) +
+  scale_y_log10()
+```
+
+```{r}
+metrics |>
+  group_by(method) |>
+  slice_max(mae, n = 5)
+
+metrics |>
+  group_by(method) |>
+  slice_min(mae, n = 5)
+```
+
+```{r}
+for (i in seq_along(cvs[["mdsine"]]$y_hat)) {
+  subject_data(cvs[["mdsine"]]$y_hat[[i]]) <-  tibble(
+    subject  = names(cvs[["mdsine"]]$y_hat[[i]])
+  )
+}
+
+y_hats <- list(
+  "mdsine" = map_dfr(cvs[["mdsine"]]$y_hat, ~ pivot_ts(.), .id = "fold"),
+  "mbtransfer" = map_dfr(cvs[["mbtransfer"]]$y_hat, ~ pivot_ts(.), .id = "fold")
+) |>
+  bind_rows(.id = "method")
+```
+
+
+```{r}
+differenced_data <- y_hats |>
+  left_join(pivot_ts(ts) |> rename(truth = value) |> select(-V1)) |> 
+  mutate(
+    difference = value - truth,
+    difference = ifelse(difference > 50, 50, difference),
+    difference = ifelse(difference < -50, -50, difference)
+  )
+```
+
+
+```{r, fig.width = 12, fig.height = 8}
+ggplot(differenced_data) +
+  geom_tile(aes(time, subject, fill = difference, color = difference)) +
+  scale_fill_gradient2(low = "#048ABF", mid = "white", high = "#F27405")  +
+  scale_color_gradient2(low = "#048ABF", mid = "white", high = "#F27405")  +
+  facet_wrap(method ~ fold, scales = "free_y") +
+  scale_x_continuous(limits = c(-8, 12), expand = c(0, 0)) +
+  theme(
+    axis.text.y = element_text(size = 8),
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 12),
+    panel.background = element_rect(fill = "#d3d3d3")
+  )
+```
