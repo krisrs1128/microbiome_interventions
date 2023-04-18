@@ -1,0 +1,22 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tfPaper)
+library(mbtransfer)
+library(tidyverse)
+library(fs)
+library(tidymodels)
+theme_set(my_theme())
+```
+
+```{r}
+data_dir <- path("../../microbiome_transfer_data/aqua")
+```
