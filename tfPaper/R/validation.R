@@ -60,6 +60,7 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
       values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_starts[i]), drop = FALSE]
       predict_ix <- seq_len(min(t_starts[i] + n_ahead, ncol(splits$test[[i]])))
       interventions(stest[[i]]) <- interventions(stest[[i]])[, predict_ix, drop = FALSE]
+      stest[[i]]@time <- stest[[i]]@time[seq_len(t_starts[i])]
     }
     
     y_hat[[k]] <- predict(fits[[k]], stest)
