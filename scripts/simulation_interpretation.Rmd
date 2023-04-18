@@ -74,10 +74,6 @@ computation |>
 ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/computation-sim.png", width = 8, height = 4)
 ```
 
-```{r}
-head(metrics)
-```
-
 ```{r, fig.width = 12, fig.height = 6}
 metrics <- metrics |>
   left_join(metadata) |>

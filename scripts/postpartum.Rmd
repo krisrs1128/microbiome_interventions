@@ -108,6 +108,53 @@ subject_data(ts) <- subject_data(ts) |>
 fit <- tr_fun(ts)
 ```
 
+## Smoothing and Out-of-Sample Performance
+
+```{r}
+ts_missing <- subset_values(ts, 1:8)
+fit <- mbtransfer(ts, P = 3, Q = 3)
+ts_pred <- predict(fit, ts_missing)
+```
+
+```{r}
+#fit <- mbtransfer(ts[c(1:5, 11:15)], P = 3, Q = 3) # uncomment for out-of-sample error
+#ts_pred <- predict(fit, ts_missing[c(6:10, 16:20)])
+```
+
+```{r}
+ts_df <- pivot_ts(ts_pred) |>
+  rename(y_hat = value) |>
+  select(taxon, sample, time, y_hat) |>
+  mutate(h = time - 2) |>
+  left_join(pivot_ts(ts)) |>
+  rename(y = value) |>
+  filter(y != y_hat)
+```
+
+```{r, fig.width = 10, fig.height = 6}
+common_taxa <- ts_df |>
+  group_by(taxon) |>
+  summarise(mean_y = mean(y)) |>
+  slice_max(mean_y, n = 18) |>
+  pull(taxon)
+
+ts_df |>
+  filter(taxon %in% common_taxa, h < 6) |>
+  ggplot() +
+  geom_abline(slope = 1, col = "#400610") +
+  geom_point(aes(y, y_hat, col = factor(h)), size = 1.5, alpha = 1) +
+  scale_color_brewer(palette = "Reds", direction = -1) +
+  facet_wrap(~ reorder(taxon, -y), scales = "free", ncol = 6) +
+  labs(x = expression(y), y = expression(hat(y)), col = "Steps Ahead") +
+  theme(
+    axis.text = element_text(size = 10),
+    panel.spacing = unit(0, "line")
+  )
+
+#ggsave("~/Downloads/postpartum_forecast_error.png", width = 10, height = 6)
+```
+
+
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
 staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 20)
