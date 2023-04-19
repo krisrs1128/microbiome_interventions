@@ -18,5 +18,7 @@ theme_set(my_theme())
 ```
 
 ```{r}
-data_dir <- path("../../microbiome_transfer_data/aqua")
+data_dir <- path("../data/aqua")
+readRDS(data_dir / )
 ```
+
