@@ -1,0 +1,70 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tfPaper)
+library(mbtransfer)
+library(tidyverse)
+library(fs)
+library(tidymodels)
+theme_set(my_theme())
+```
+
+```{r}
+ts_list <- list(
+  diet = readRDS("../data/ts-diet.rds"),
+  postpartum = readRDS("../data/ts-postpartium.rds")
+)
+```
+
+```{r}
+ts_df <- map(ts_list, pivot_ts)
+```
+
+```{r}
+library(glue)
+
+composition_plot <- function(ts_df, width = 1, ymax = 1) {
+  ts1 <- ts_df |>
+    group_by(sample) |>
+    mutate(prop = value / sum(value))
+
+  top_taxa <- ts1 |>
+    group_by(taxon) |>
+    summarise(totals = sum(prop)) |>
+    arrange(-totals) |>
+    pull(taxon)
+  
+  ts1 |>
+    filter(taxon %in% top_taxa[1:8]) |>
+    ggplot() +
+    geom_col(aes(time, prop, fill = reorder(taxon, prop)), width = width) +
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, ymax)) +
+    facet_grid(. ~ subject, scales = "free_x", space = "free_x") +
+    theme(
+      panel.background = element_rect(fill = "#f7f7f7"),
+      panel.grid = element_blank()
+    ) +
+    scale_fill_brewer(palette = "Set2", direction = -1)
+  }
+```
+
+
+```{r}
+ts_df[[1]] |>
+  filter(subject %in% glue("Animal{1:2}")) |>
+  composition_plot(ymax = 0.35)
+
+ts_df[[2]] |>
+  filter(subject %in% c("S10004", "S10079")) |>
+  composition_plot(width = 14, ymax = 0.5)
+```
+
