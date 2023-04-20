@@ -21,7 +21,6 @@ library(tfPaper)
 library(mbtransfer)
 library(mdsine)
 theme_set(my_theme())
-set.seed(20230417)
 ```
 
 Comparison in MDSINE vs. mbtransfer predictions.
@@ -63,10 +62,8 @@ configurations <- configurations |>
 
 ```{r}
 cvs <- list()
-set.seed(123)
-cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, hyper$taxonomy), K = 4)
-set.seed(123)
-cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4)
+cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, hyper$taxonomy), K = 4, seeds = 1:4)
+cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4, seeds = 1:4)
 saveRDS(cvs, "../data/compare-trajectories.rds")
 #cvs <- readRDS("../data/compare-trajectories.rds")
 ```
@@ -122,7 +119,7 @@ ggplot(differenced_data) +
   geom_tile(aes(time, subject, fill = difference, color = difference)) +
   scale_fill_gradient2(low = "#048ABF", mid = "white", high = "#F27405")  +
   scale_color_gradient2(low = "#048ABF", mid = "white", high = "#F27405")  +
-  facet_wrap(method ~ fold, scales = "free_y") +
+  facet_wrap(method ~ fold, scales = "free_y", ncol = 4) +
   scale_x_continuous(limits = c(-8, 12), expand = c(0, 0)) +
   theme(
     axis.text.y = element_text(size = 8),
