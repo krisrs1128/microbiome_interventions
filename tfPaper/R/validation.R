@@ -42,7 +42,7 @@ evaluation <- function(y, y_hat, test_ix) {
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr separate
 #' @export
-cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
+cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1, seeds = NULL) {
   N <- length(ts_inter)
 
   fits <- list()
@@ -50,6 +50,9 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
   metrics <- list()
   
   for (k in seq_len(K)) {
+    if (!is.null(seeds)) {
+      set.seed(seeds[k])
+    }
     splits <- train_test_split(ts_inter, 1 / K)
     fits[[k]] <- train(splits$train)
 
@@ -60,7 +63,7 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1) {
       values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_starts[i]), drop = FALSE]
       predict_ix <- seq_len(min(t_starts[i] + n_ahead, ncol(splits$test[[i]])))
       interventions(stest[[i]]) <- interventions(stest[[i]])[, predict_ix, drop = FALSE]
-      stest[[i]]@time <- stest[[i]]@time[seq_len(t_starts[i])]
+      stest[[i]]@time <- stest[[i]]@time[predict_ix]
     }
     
     y_hat[[k]] <- predict(fits[[k]], stest)

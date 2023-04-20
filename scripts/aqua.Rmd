@@ -9,16 +9,72 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(tfPaper)
-library(mbtransfer)
-library(tidyverse)
 library(fs)
-library(tidymodels)
+library(mbtransfer)
+library(phyloseq)
+library(tfPaper)
+library(tidyverse)
 theme_set(my_theme())
 ```
 
 ```{r}
+read_fun <- function(x) {
+  if(str_detect(x, "rds")) {
+    return (readRDS(x))
+  }
+  read_tsv(x)
+}
+
 data_dir <- path("../data/aqua")
-readRDS(data_dir / )
+aqua_data <- dir_map(data_dir, read_fun)
 ```
 
+First, we reshape and impute the eel activity data.
+
+
+```{r}
+tank_data <- aqua_data[[1]] |>
+  pivot_longer(-Day) |>
+  separate(name, c("tank", "variable")) |>
+  arrange(tank, variable, Day)
+
+for (i in seq_len(nrow(tank_data))) {
+  if (is.na(tank_data$value[i])) {
+    tank_data$value[i] <- tank_data$value[i - 1]
+  }
+}
+
+tank_data <- tank_data |>
+  pivot_wider(names_from = variable, values_from = value)
+```
+
+Next, we aggregate to the taxon level.
+
+```{r}
+x <- otu_table(aqua_data[[4]], taxa_are_rows = FALSE)
+z <- aqua_data[[2]] |>
+  filter(Sample.ID %in% rownames(x)) |>
+  mutate(sample = rownames(x)) |>
+  column_to_rownames("sample") |>
+  sample_data()
+tax_tab <- tax_table(aqua_data[[3]])
+taxa_names(tax_tab) <- colnames(x)
+
+ps <- phyloseq(x, z, tax_tab) |>
+  tax_glom(taxrank = "ta7")
+```
+
+```{r}
+reads <- otu_table(ps)
+samples <- sample_data(ps)
+subject <- samples |>
+  select(tank) |>
+  mutate(id = seq_len(n()))
+
+ts <- reads |>
+  normalize("DESeq2-asinh", samples) |>
+  ts_from_dfs(interventions, samples, subject) |>
+  interpolate(method = "linear")
+
+saveRDS(ts, "../data/ts-aqua.rds")
+```
