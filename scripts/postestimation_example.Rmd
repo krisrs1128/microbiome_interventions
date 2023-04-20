@@ -1,0 +1,111 @@
+---
+title: "Untitled"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(fs)
+library(tidyverse)
+library(xgboost)
+library(mbtransfer)
+library(tfPaper)
+library(splines)
+```
+
+```{r}
+data_dir <- path("../../microbiome_transfer_data/david")
+reads <- read_csv(data_dir / "abundance.csv") |>
+  rename(sample = `...1`) |>
+  column_to_rownames("sample") |>
+  as.matrix()
+
+samples <- read_csv(data_dir / "sample_metadata.csv", col_names = c("sample", "subject", "time")) |>
+  mutate(intervention = str_extract(subject, "[A-z]+"))
+subject <- read_csv(data_dir / "subject_data.csv")
+
+keep_ix <- colMeans(reads != 0) > 0.4
+reads <- reads[, as.logical(keep_ix)]
+```
+
+```{r}
+interventions <- samples |>
+  select(time, intervention, sample) |>
+  mutate(value = 1) |>
+  pivot_wider(names_from = intervention, values_fill = 0) |>
+  column_to_rownames("sample") |>
+  mutate(
+    perturbation_window = time >= 0 & time <= 5,
+    Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
+    Plant = ifelse(perturbation_window & Plant == 1, 1, 0)
+  ) |>
+  select(Plant, Animal)
+
+subject <- subject |>
+  rename(subject = subject_ID)
+samples <- samples |>
+  rename(condition = intervention)
+```
+
+```{r}
+ts <- reads |>
+  normalize("DESeq2-asinh", samples) |>
+  ts_from_dfs(interventions, samples, subject) |>
+  interpolate(method = "linear")
+```
+
+```{r}
+subject_data(ts) <- subject_data(ts) |>
+  mutate(diet = ifelse(diet == "Plant", 0, 1))
+
+ts_missing <- subset_values(ts, 1:8)
+fit <- mbtransfer(ts, P = 2, Q = 2)
+ts_pred <- predict(fit, ts_missing)
+```
+
+Post estimation doesn't really help...
+
+```{r}
+x <- map(ts_missing, values) %>%
+  do.call(cbind, .)
+
+ts2 <- ts
+ts_pred2 <- ts_pred
+for (i in seq_along(ts_pred2)) {
+  ts2[[i]] <- ts2[[i]][, 9:ncol(ts[[i]])]
+  ts_pred2[[i]] <- ts_pred2[[i]][, 9:ncol(ts_pred2[[i]])]
+}
+
+y <- map(ts2, values) %>%
+  do.call(cbind, .)
+
+y_hat_ <- map(ts_pred2, values) %>%
+  do.call(cbind, .)
+
+plot(y[1, ], y_hat_[1, ])
+```
+
+```{r}
+D <- dist(log(1 + x))
+
+smooth_predictions <- function(y_hat, D, K = 3, ...) {
+  coords <- cmdscale(D, k = K)
+  fit <- lm(y_hat ~ ns(coords[, 1], ...) + ns(coords[, 2], ...) + ns(coords[, 3], ...))
+  predict(fit)
+}
+
+ix <- 10
+y_hat <- y_hat_[, ix]
+plot(y[, ix], y_hat)
+y_smooth <- smooth_predictions(y_hat, D, df = 50)
+points(y[, ix], y_smooth, col = "red")
+
+mean((y[, ix] - y_hat) ^ 2)
+mean((y[, ix] - y_smooth) ^ 2)
+
+```
+
