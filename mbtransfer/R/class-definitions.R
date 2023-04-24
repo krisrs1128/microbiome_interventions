@@ -53,7 +53,6 @@ subset_values <- function(ts, ix) {
   ts_missing <- ts
   for (i in seq_along(ts)) {
     values(ts_missing[[i]]) <- values(ts_missing[[i]][, ix])
-    ts_missing[[i]]@time <- ts_missing[[i]][, ix]@time
   }
   ts_missing
 }
