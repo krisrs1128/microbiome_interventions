@@ -3,7 +3,7 @@
 #' @importFrom DESeq2 sizeFactors estimateSizeFactors
 deseq_normalize <- function(reads, metadata) {
   # construct design for DESeq2 object
-  if (is.null(metadata)) {
+  if (!("condition" %in% colnames(metadata))) {
     fmla <- formula(~ 1)
   } else {
     fmla <- formula(~ condition)
