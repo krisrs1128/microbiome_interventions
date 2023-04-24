@@ -15,6 +15,7 @@ library(phyloseq)
 library(fs)
 library(glue)
 library(tidyverse)
+library(tfPaper)
 ```
 
 ### Diet Study
@@ -49,31 +50,34 @@ taxonomy <- taxonomy |>
   bind_rows(data.frame(name = taxa_names[new_ix]))
 ```
 
-
 ```{r}
 interventions <- samples |>
   select(time, intervention, sample) |>
   mutate(value = 1) |>
   pivot_wider(names_from = intervention, values_fill = 0) |>
-  column_to_rownames("sample") |>
   mutate(
     perturbation_window = time >= 0 & time <= 5,
     Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
     Plant = ifelse(perturbation_window & Plant == 1, 1, 0)
   ) |>
-  select(Plant, Animal)
+  select(sample, Plant, Animal)
 
 subject <- subject |>
   rename(subject = subject_ID)
 samples <- samples |>
   rename(condition = intervention)
+
+reads <- reads |>
+  normalize("DESeq2-asinh", samples) |>
+  data.frame() |>
+  rownames_to_column("sample")
 ```
 
 
 ```{r}
 tmp <- path(params$out_dir) / "diet"
 dir_create(tmp)
-write_csv(as.data.frame(reads), tmp / "reads.csv")
+write_csv(reads, tmp / "reads.csv")
 write_csv(samples, tmp / "samples.csv")
 write_csv(interventions, tmp / "interventions.csv")
 write_csv(subject, tmp / "subject.csv")
@@ -144,6 +148,11 @@ metadata  <- samples |>
   ungroup() |>
   select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
 
+reads <- reads |>
+  normalize("DESeq2-asinh", metadata) |>
+  data.frame() |>
+  rownames_to_column("sample")
+
 tmp <- path(params$out_dir) / "postpartum"
 dir_create(tmp)
 write_csv(reads, tmp / "reads.csv")
@@ -170,7 +179,8 @@ download.file(file.path(data_dir, "seqtabBac.rds"), tmp / "seqtabBac.rds")
 download.file(file.path(data_dir, "Sample.List_1.txt"), tmp / "Sample.List_1.txt") 
 download.file(file.path(data_dir, "Parameters_3.txt"), tmp / "Parameters_3.txt") 
 download.file(file.path(data_dir, "Taxa_list_with_sequence.rds"), tmp / "Taxa_list_with_sequence.rds") 
-aqua_data <- dir_map(tmp, read_fun, type = "file")
+aqua_data <- dir_ls(tmp, regexp = "*.(rds|txt)") |>
+  map(read_fun)
 ```
 
 First, we reshape and impute the eel activity data.
@@ -235,13 +245,18 @@ interventions <- samples |>
   left_join(tank_data, by = c("time" = "Day", "subject" = "tank")) |>
   column_to_rownames("sample") |>
   select(pH, AS)
+
+reads <- reads |>
+  normalize("DESeq2-asinh", samples) |>
+  data.frame() |>
+  rownames_to_column("sample")
 ```
 
 ```{r, fig.height = 8, fig.width = 4}
 interventions |>
   rownames_to_column("sample") |>
   left_join(samples) |>
-  left_join(rownames_to_column(data.frame(reads[, 1:11]), "sample")) |>
+  left_join(reads[, 1:11]) |>
   pivot_longer(starts_with("X_"), names_to = "taxon") |>
   ggplot() +
   geom_point(aes(asinh(value), pH, col = subject)) +
@@ -250,7 +265,7 @@ interventions |>
 interventions |>
   rownames_to_column("sample") |>
   left_join(samples) |>
-  left_join(rownames_to_column(data.frame(reads[, 1:11]), "sample")) |>
+  left_join(reads[, 1:11]) |>
   ggplot() +
   geom_line(aes(time, asinh(X_0010), group = subject)) +
   geom_line(aes(time, pH, group = subject), col = "red")
@@ -261,7 +276,7 @@ interventions |>
 tmp <- path(params$out_dir) / "aqua"
 dir_create(tmp)
 write_csv(samples, tmp / "samples.csv")
-write_csv(as.data.frame(reads), tmp / "reads.csv")
+write_csv(reads, tmp / "reads.csv")
 write_csv(subject, tmp / "subject.csv")
 write_csv(interventions, tmp / "interventions.csv")
 ```
