@@ -19,68 +19,7 @@ library(tfPaper)
 theme_set(my_theme())
 ```
 
-```{r}
-root_dir <- path(params$root_dir)
-load(root_dir / "data_post.RData")
-```
-
-```{r}
-post.df <- post.df |>
-  filter(PregOut != "Miscarriage", MonVsDel %in% -7:13, LibrarySize >= 4e4) |>
-  group_by(SubjID) |>
-  filter(
-    max(DayVsDel) > 4, 
-    n() > 20
-  )
-
-samples <- post.df |>
-  rename(sample = SampleID, time = DayVsDel) |>
-  mutate(
-    condition = time > 0,
-    subject = glue("S{SubjID}"),
-    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
-  ) |>
-  ungroup() |>
-  select(-SubjID)
-
-reads <- post.df |>
-  ungroup() |>
-  select(SampleID, LibrarySize, Lactobacillus:L.other) |>
-  column_to_rownames("SampleID") |>
-  mutate(across(Lactobacillus:L.other, ~ LibrarySize * .)) |>
-  select(-LibrarySize)
-  
-subject_data <- post.df |>
-  select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
-  ungroup() |>
-  mutate(
-    bmi_cut = cut(BmiPre, breaks = quantile(BmiPre, seq(0, 1, length.out = 4))),
-    subject = glue("S{SubjID}"),
-    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
-  ) |>
-  select(-SubjID) |>
-  group_by(subject) |>
-  filter(row_number() == 1)
-
-interventions <- samples |>
-  mutate(birth = 1 * (time > -14 & time < 0)) |>
-  ungroup() |>
-  select(sample, birth) |>
-  column_to_rownames("sample")
-```
-
-```{r}
-samples |>
-  left_join(interventions |> rownames_to_column("sample")) |>
-  ggplot() +
-  geom_point(aes(time, subject, col = birth))
-```
-
-```{r}
-metadata  <- samples |>
-  ungroup() |>
-  select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
-
+r````{r}
 ts <- reads |>
  normalize("DESeq2-asinh", metadata) |>
  ts_from_dfs(interventions, samples, subject_data) |>
@@ -143,9 +82,9 @@ ts_df |>
   ggplot() +
   geom_abline(slope = 1, col = "#400610") +
   geom_point(aes(y, y_hat, col = factor(h)), size = 1.5, alpha = 1) +
-  scale_color_brewer(palette = "Reds", direction = -1) +
+  scale_color_brewer(palette = "reds", direction = -1) +
   facet_wrap(~ reorder(taxon, -y), scales = "free", ncol = 6) +
-  labs(x = expression(y), y = expression(hat(y)), col = "Steps Ahead") +
+  labs(x = expression(y), y = expression(hat(y)), col = "steps ahead") +
   theme(
     axis.text = element_text(size = 10),
     panel.spacing = unit(0, "line")
