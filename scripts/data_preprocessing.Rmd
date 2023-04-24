@@ -1,0 +1,267 @@
+---
+title: "Preprocessing"
+output: html_document
+date: "`r Sys.Date()`"
+params:
+  out_dir: "~/Downloads/"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(phyloseq)
+library(fs)
+library(glue)
+library(tidyverse)
+```
+
+### Diet Study
+
+```{r}
+Sys.setenv("VROOM_CONNECTION_SIZE" = 1e7)
+data_dir <- "https://g-5b2b0e.dtn.globus.wisc.edu/microbiome_interventions/diet_raw/"
+reads <- read_csv(file.path(data_dir, "abundance.csv")) |>
+  rename(sample = `...1`) |>
+  column_to_rownames("sample") |>
+  as.matrix()
+samples <- read_csv(file.path(data_dir,"sample_metadata.csv"), col_names = c("sample", "subject", "time")) |>
+  mutate(intervention = str_extract(subject, "[A-z]+"))
+subject <- read_csv(file.path(data_dir, "subject_data.csv"))
+
+keep_ix <- colMeans(reads != 0) > 0.4
+reads <- reads[, as.logical(keep_ix)]
+```
+
+```{r}
+taxonomy <- read_csv(file.path(data_dir, "taxaTable.csv")) |>
+  mutate(
+    name = str_c("Otu", str_pad(tax_id, 6, "left", "0")),
+    sequence = NA,
+  ) |>
+  filter(name %in% colnames(reads)) |>
+  rename(kingdom = superkingdom)
+
+taxa_names <- colnames(reads)
+new_ix <- !(taxa_names %in% taxonomy$name)
+taxonomy <- taxonomy |>
+  bind_rows(data.frame(name = taxa_names[new_ix]))
+```
+
+
+```{r}
+interventions <- samples |>
+  select(time, intervention, sample) |>
+  mutate(value = 1) |>
+  pivot_wider(names_from = intervention, values_fill = 0) |>
+  column_to_rownames("sample") |>
+  mutate(
+    perturbation_window = time >= 0 & time <= 5,
+    Animal = ifelse(perturbation_window & Animal == 1, 1, 0),
+    Plant = ifelse(perturbation_window & Plant == 1, 1, 0)
+  ) |>
+  select(Plant, Animal)
+
+subject <- subject |>
+  rename(subject = subject_ID)
+samples <- samples |>
+  rename(condition = intervention)
+```
+
+
+```{r}
+tmp <- path(params$out_dir) / "diet"
+dir_create(tmp)
+write_csv(as.data.frame(reads), tmp / "reads.csv")
+write_csv(samples, tmp / "samples.csv")
+write_csv(interventions, tmp / "interventions.csv")
+write_csv(subject, tmp / "subject.csv")
+```
+
+### Postpartum Study
+
+```{r}
+source_path <- path(params$out_dir) / "data_post.RData"
+download.file("https://g-5b2b0e.dtn.globus.wisc.edu/microbiome_interventions/data_post.RData", source_path)
+load(source_path)
+```
+
+```{r}
+post.df <- post.df |>
+  filter(PregOut != "Miscarriage", MonVsDel %in% -7:13, LibrarySize >= 4e4) |>
+  group_by(SubjID) |>
+  filter(
+    max(DayVsDel) > 4, 
+    n() > 20
+  )
+
+samples <- post.df |>
+  rename(sample = SampleID, time = DayVsDel) |>
+  mutate(
+    condition = time > 0,
+    subject = glue("S{SubjID}"),
+    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
+  ) |>
+  ungroup() |>
+  select(-SubjID)
+
+reads <- post.df |>
+  ungroup() |>
+  select(SampleID, LibrarySize, Lactobacillus:L.other) |>
+  column_to_rownames("SampleID") |>
+  mutate(across(Lactobacillus:L.other, ~ LibrarySize * .)) |>
+  select(-LibrarySize)
+  
+subject_data <- post.df |>
+  select(SubjID, HistoryPreterm, Race, Ethnicity, BmiPre, BirthControlYesNo) |>
+  ungroup() |>
+  mutate(
+    bmi_cut = cut(BmiPre, breaks = quantile(BmiPre, seq(0, 1, length.out = 4))),
+    subject = glue("S{SubjID}"),
+    BirthControlYesNo = fct_na_value_to_level(BirthControlYesNo, level = "missing")
+  ) |>
+  select(-SubjID) |>
+  group_by(subject) |>
+  filter(row_number() == 1)
+
+interventions <- samples |>
+  mutate(birth = 1 * (time > -14 & time < 0)) |>
+  ungroup() |>
+  select(sample, birth) |>
+  column_to_rownames("sample")
+```
+
+```{r}
+samples |>
+  left_join(interventions |> rownames_to_column("sample")) |>
+  ggplot() +
+  geom_point(aes(time, subject, col = birth))
+```
+
+```{r}
+metadata  <- samples |>
+  ungroup() |>
+  select(sample, condition, AgeDel, BmiPre, BirthControlYesNo, PriorParity)
+
+tmp <- path(params$out_dir) / "postpartum"
+dir_create(tmp)
+write_csv(reads, tmp / "reads.csv")
+write_csv(metadata, tmp / "metadata.csv")
+write_csv(samples, tmp / "samples.csv")
+write_csv(subject_data, tmp / "subject_data.csv")
+write_csv(interventions, tmp / "interventions.csv")
+```
+
+### Aquaculture Study
+
+```{r}
+read_fun <- function(x) {
+  if(str_detect(x, "rds")) {
+    return (readRDS(x))
+  }
+  read_tsv(x)
+}
+
+data_dir <- "https://g-5b2b0e.dtn.globus.wisc.edu/microbiome_interventions/aqua_raw/"
+
+tmp <- path(tempdir())
+download.file(file.path(data_dir, "seqtabBac.rds"), tmp / "seqtabBac.rds") 
+download.file(file.path(data_dir, "Sample.List_1.txt"), tmp / "Sample.List_1.txt") 
+download.file(file.path(data_dir, "Parameters_3.txt"), tmp / "Parameters_3.txt") 
+download.file(file.path(data_dir, "Taxa_list_with_sequence.rds"), tmp / "Taxa_list_with_sequence.rds") 
+aqua_data <- dir_map(tmp, read_fun, type = "file")
+```
+
+First, we reshape and impute the eel activity data.
+
+
+```{r}
+tank_data <- aqua_data[[1]] |>
+  pivot_longer(-Day) |>
+  separate(name, c("tank", "variable")) |>
+  arrange(tank, variable, Day)
+
+for (i in seq_len(nrow(tank_data))) {
+  if (is.na(tank_data$value[i])) {
+    tank_data$value[i] <- tank_data$value[i - 1]
+  }
+}
+
+tank_data <- tank_data |>
+  pivot_wider(names_from = variable, values_from = value)
+```
+
+Next, we aggregate to the taxon level.
+
+```{r}
+x <- otu_table(aqua_data[[4]], taxa_are_rows = FALSE)
+z <- aqua_data[[2]] |>
+  filter(Sample.ID %in% rownames(x)) |>
+  mutate(sample = rownames(x)) |>
+  column_to_rownames("sample") |>
+  sample_data()
+tax_tab <- tax_table(aqua_data[[3]][, -1])
+taxa_names(tax_tab) <- colnames(x)
+
+ps <- phyloseq(x, z, tax_tab) |>
+  tax_glom(taxrank = "ta7")
+```
+
+```{r}
+prevalent <- colMeans(otu_table(ps) > 0) > 0.4
+prevalent <- names(prevalent[which(prevalent)])
+ps <- prune_taxa(prevalent, ps)
+```
+
+```{r}
+reads <- otu_table(ps)
+samples <- sample_data(ps) |>
+  as_tibble() |>
+  rename(
+    "sample" = "Sample.ID",
+    "subject" = "Tank",
+    "time" = "Day"
+    ) |>
+  mutate(subject = glue("T{subject}"))
+
+subject <- samples |>
+  as_tibble() |>
+  select(subject) |>
+  distinct() |>
+  mutate(id = seq_len(n()))
+
+interventions <- samples |>
+  left_join(tank_data, by = c("time" = "Day", "subject" = "tank")) |>
+  column_to_rownames("sample") |>
+  select(pH, AS)
+```
+
+```{r, fig.height = 8, fig.width = 4}
+interventions |>
+  rownames_to_column("sample") |>
+  left_join(samples) |>
+  left_join(rownames_to_column(data.frame(reads[, 1:11]), "sample")) |>
+  pivot_longer(starts_with("X_"), names_to = "taxon") |>
+  ggplot() +
+  geom_point(aes(asinh(value), pH, col = subject)) +
+  facet_grid(taxon ~ subject)
+
+interventions |>
+  rownames_to_column("sample") |>
+  left_join(samples) |>
+  left_join(rownames_to_column(data.frame(reads[, 1:11]), "sample")) |>
+  ggplot() +
+  geom_line(aes(time, asinh(X_0010), group = subject)) +
+  geom_line(aes(time, pH, group = subject), col = "red")
+```
+
+
+```{r}
+tmp <- path(params$out_dir) / "aqua"
+dir_create(tmp)
+write_csv(samples, tmp / "samples.csv")
+write_csv(as.data.frame(reads), tmp / "reads.csv")
+write_csv(subject, tmp / "subject.csv")
+write_csv(interventions, tmp / "interventions.csv")
+```
