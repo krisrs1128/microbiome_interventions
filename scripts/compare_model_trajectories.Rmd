@@ -62,10 +62,10 @@ configurations <- configurations |>
 
 ```{r}
 cvs <- list()
-cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, hyper$taxonomy), K = 4, seeds = 1:4)
-cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4, seeds = 1:4)
-saveRDS(cvs, "../data/compare-trajectories.rds")
-#cvs <- readRDS("../data/compare-trajectories.rds")
+#cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, hyper$taxonomy), K = 4, seeds = 1:4)
+#cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4, seeds = 1:4)
+#saveRDS(cvs, "../data/compare-trajectories.rds")
+cvs <- readRDS("../data/compare-trajectories.rds")
 ```
 
 ### Visualize the Differences
@@ -127,4 +127,5 @@ ggplot(differenced_data) +
     strip.text = element_text(size = 12),
     panel.background = element_rect(fill = "#d3d3d3")
   )
+ggsave("~/Downloads/differenced_data.png", width = 12, height = 5)
 ```
