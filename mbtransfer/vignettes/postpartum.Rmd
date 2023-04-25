@@ -64,52 +64,35 @@ fit <- tr_fun(ts)
 ## Smoothing and Out-of-Sample Performance
 
 ```{r}
-ts_missing <- subset_values(ts, 1:8)
-fit <- mbtransfer(ts, P = 3, Q = 3)
-
-ts_preds <- list()
-ts_pred <- predict(fit, ts_missing)
+ts_missing <- subset_values(ts, 1:6)
 ts_preds[["in-sample"]] <- predict(fit, ts_missing)
+
+fit <- mbtransfer(ts[1:25], P = 3, Q = 3)
+ts_preds[["out-of-sample"]] <- predict(fit, ts_missing[26:49])
 ```
 
-```{r}
-fit <- mbtransfer(ts[c(1:5, 11:15)], P = 3, Q = 3) # uncomment for out-of-sample error
-ts_preds[["out_of_sample"]] <- predict(fit, ts_missing[c(6:10, 16:20)])
-```
-
-```{r}
-ts_df <- pivot_ts(ts_pred) |>
-  rename(y_hat = value) |>
-  select(taxon, sample, time, y_hat) |>
-  mutate(h = time - 2) |>
-  left_join(pivot_ts(ts)) |>
-  rename(y = value) |>
-  filter(y != y_hat)
-```
 
 ```{r, fig.width = 10, fig.height = 6}
-common_taxa <- ts_df |>
-  group_by(taxon) |>
-  summarise(mean_y = mean(y)) |>
-  slice_max(mean_y, n = 18) |>
-  pull(taxon)
-
-ts_df |>
-  filter(taxon %in% common_taxa, h < 6) |>
-  ggplot() +
-  geom_abline(slope = 1, col = "#400610") +
-  geom_point(aes(y, y_hat, col = factor(h)), size = 1.5, alpha = 1) +
-  scale_color_brewer(palette = "reds", direction = -1) +
-  facet_wrap(~ reorder(taxon, -y), scales = "free", ncol = 6) +
-  labs(x = expression(y), y = expression(hat(y)), col = "steps ahead") +
-  theme(
-    axis.text = element_text(size = 10),
-    panel.spacing = unit(0, "line")
-  )
-
-#ggsave("~/Downloads/postpartum_forecast_error.png", width = 10, height = 6)
+map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
+    filter(h > 0, h < 6) |>
+    ggplot() +
+    geom_abline(slope = 1, col = "#400610") +
+    geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
+    facet_grid(factor(quantile, rev(levels(quantile))) ~ glue("lag {h}"), scales = "free_y") +
+    labs(x = expression(y), y = expression(hat(y)), col = "Steps Ahead") +
+    scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_color_manual(values = c("#A65883", "#6593A6")) +
+    guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+    theme(
+      axis.text = element_text(size = 10),
+      panel.spacing = unit(0, "line"),
+      strip.text.y = element_text(angle = 0, size = 12),
+      strip.text.x = element_text(angle = 0, size = 12),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 11),
+    )
 ```
-
 
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
@@ -172,64 +155,6 @@ ribbon_plot(rdata, group = "BC") +
 #ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/counterfactual_postpartum_staxa.png", width = 9, height = 4.5)
 ```
 
-```{r}
-ts_missing <- subset_values(ts, 1:6)
-ts_preds[["in-sample"]] <- predict(fit, ts_missing)
-
-fit <- mbtransfer(ts[1:25], P = 3, Q = 3)
-ts_preds[["out-of-sample"]] <- predict(fit, ts_missing[26:49])
-```
-
-
-```{r, fig.width = 10, fig.height = 6}
-map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
-    filter(h > 0, h < 6) |>
-    ggplot() +
-    geom_abline(slope = 1, col = "#400610") +
-    geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
-    facet_grid(factor(quantile, rev(levels(quantile))) ~ glue("lag {h}"), scales = "free_y") +
-    labs(x = expression(y), y = expression(hat(y)), col = "Steps Ahead") +
-    scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
-    scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
-    scale_color_manual(values = c("#A65883", "#6593A6")) +
-    guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-    theme(
-      axis.text = element_text(size = 10),
-      panel.spacing = unit(0, "line"),
-      strip.text.y = element_text(angle = 0, size = 12),
-      strip.text.x = element_text(angle = 0, size = 12),
-      legend.title = element_text(size = 14),
-      legend.text = element_text(size = 11),
-    )
-```
-
-
-```{r, fig.height = 6, fig.width = 10}
-subject_errors <- map_dfr(ts_preds[["in-sample"]] - ts, ~ tibble(mse = mean(abs(values(.)))), .id = "subject")
-
-quantiles <- quantile(subject_errors$mse, c(0.1, 0.9))
-values_df |>
-  left_join(subject_errors) |>
-  filter(taxon %in% focus_taxa, mse > quantiles[2] | mse < quantiles[1]) |>
-  mutate(
-    low_error = ifelse(mse < quantiles[1], "Small Residual", "Large Residual"),
-    low_error = factor(low_error, levels = c("Small Residual", "Large Residual")),
-    taxon = factor(taxon, levels = focus_taxa)
-    ) |>
-  ggplot() +
-  geom_vline(xintercept = 0, col = "#d3d3d3", size = 2) +
-  geom_line(aes(time, value, group = subject), alpha = 0.7, size = 0.4) +
-  facet_grid(reorder(taxon, -value) ~ low_error, scales = "free") +
-  scale_x_continuous(expand = c(0, 0)) +
-  labs(y = "Abundance") +
-  theme(
-    strip.text.y = element_text(angle = 0, size = 12),
-    strip.text.x = element_text(size = 12),
-    axis.text = element_text(size = 8)
-  )
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/residual_postpartum.png", width = 10, height = 6)
-```
-
 ```{r, fig.width = 10, fig.height = 5}
 values_df <- pivot_ts(ts) |>
   group_by(taxon) |>
@@ -245,3 +170,5 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
 ggsave("~/Downloads/cover.png", dpi = 1000, width = 10, height = 4)
 #ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```
+
+
