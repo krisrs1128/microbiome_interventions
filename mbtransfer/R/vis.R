@@ -124,3 +124,24 @@ ribbon_plot <- function(rdata, group = NULL, reorder_var = NULL) {
   
   p
 }
+
+#' @importFrom dplyr rename select mutate full_join left_join group_by ungroup
+#'   summarise
+#' @export
+reshape_preds <- function(ts, ts_pred, n_quantile = 4, lag = 3) {
+  ts_df <- pivot_ts(ts_pred) |>
+    rename(y_hat = value) |>
+    select(taxon, sample, time, y_hat) |>
+    mutate(h = time - lag) |>
+    full_join(pivot_ts(ts)) |>
+    rename(y = value)
+  
+  taxa_totals <- ts_df |>
+    group_by(taxon) |>
+    summarise(total = median(y)) |>
+    ungroup() |>
+    mutate(quantile = cut(total, quantile(total, 0:n_quantile/n_quantile), include.lowest = TRUE))
+  
+  ts_df |>
+    left_join(taxa_totals)
+}
