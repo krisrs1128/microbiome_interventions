@@ -23,12 +23,12 @@ library(mbtransfer)
 library(glue)
 ```
 ```{r}
-reads <- read_csv("~/Downloads/postpartum/reads.csv") |>
+reads <- read_csv("https://figshare.com/ndownloader/files/40279108/reads.csv") |>
   column_to_rownames("sample")
 metadata <- read_csv("~/Downloads/postpartum/metadata.csv")
-samples <- read_csv("~/Downloads/postpartum/samples.csv")
-subject_data <- read_csv("~/Downloads/postpartum/subject_data.csv")
-interventions <- read_csv("~/Downloads/postpartum/interventions.csv") |>
+samples <- read_csv("https://figshare.com/ndownloader/files/40278496/samples.csv")
+subject_data <- read_csv("https://figshare.com/ndownloader/files/40275934/subject.csv")
+interventions <- read_csv("https://figshare.com/ndownloader/files/40279171/interventions.csv") |>
   column_to_rownames("sample")
 ```
 
@@ -65,6 +65,7 @@ fit <- tr_fun(ts)
 
 ```{r}
 ts_missing <- subset_values(ts, 1:6)
+ts_preds <- list()
 ts_preds[["in-sample"]] <- predict(fit, ts_missing)
 
 fit <- mbtransfer(ts[1:25], P = 3, Q = 3)
@@ -74,7 +75,8 @@ ts_preds[["out-of-sample"]] <- predict(fit, ts_missing[26:49])
 
 ```{r, fig.width = 10, fig.height = 6}
 map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
-    filter(h > 0, h < 6) |>
+    filter(h > 0, h < 50) |>
+    mutate(h = 10 * floor(h / 10)) |>
     ggplot() +
     geom_abline(slope = 1, col = "#400610") +
     geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
@@ -170,5 +172,4 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
 ggsave("~/Downloads/cover.png", dpi = 1000, width = 10, height = 4)
 #ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```
-
 
