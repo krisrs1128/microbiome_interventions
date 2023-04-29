@@ -2,7 +2,7 @@
 #' ts is a single element of a ts_inter class
 #' @export
 replace_inter_ <- function(ts, new_inter, start_ix = NULL) {
-  inter <- interventions(ts)[, seq_len(start_ix), drop = FALSE]
+  inter <- interventions(ts)[, seq_len(start_ix - 1), drop = FALSE]
   interventions(ts) <- cbind(inter, new_inter)
   ts
 }

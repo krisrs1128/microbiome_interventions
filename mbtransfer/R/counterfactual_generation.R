@@ -82,7 +82,9 @@ counterfactual_ts <- function(ts, w0, w1, start_ix = NULL) {
   }
   
   for (i in seq_along(ts)) {
-    ts[[i]] <- ts[[i]][, seq_len(start_ix[i])]
+    times_ <- ts[[i]]@time
+    ts[[i]] <- ts[[i]][, seq_len(start_ix[i] - 1)]
+    ts[[i]]@time <- times_[seq_len(start_ix[i] + ncol(w0) - 1)]
   }
 
   ts0 <- replace_inter(ts, w0, start_ix)
