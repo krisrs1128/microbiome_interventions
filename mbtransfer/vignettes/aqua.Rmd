@@ -27,7 +27,6 @@ interventions <- read_csv("https://figshare.com/ndownloader/files/40357888/inter
   column_to_rownames("sample")
 ```
 
-
 ```{r}
 ts <- reads |>
   ts_from_dfs(interventions, samples, subject) |>
@@ -47,10 +46,9 @@ ws[[1]]["AS", ] <- 38
 ws[[2]]["AS", ] <- 38
 
 #staxa <- select_taxa(ts[1:3], ws[[1]], ws[[2]], \(x) mbtransfer(x, 3, 3), n_splits = 20)
-#save(staxa, file = "../data/staxa-aqua.rds")
+#save(staxa, file = "../../data/staxa-aqua.rds")
 staxa <- readRDS("../../data/staxa-aqua.rds")
 ```
 
 Maybe show a gradually increasing trajectory?
 or better - several increasing trajectories.
-

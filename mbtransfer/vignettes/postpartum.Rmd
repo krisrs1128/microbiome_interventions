@@ -171,4 +171,3 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
 ggsave("~/Downloads/cover.png", dpi = 1000, width = 10, height = 4)
 #ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```
-

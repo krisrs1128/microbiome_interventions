@@ -19,6 +19,8 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(mbtransfer)
 library(tidyverse)
+library(glue)
+library(tidymodels)
 ```
 
 ```{r}
@@ -94,7 +96,6 @@ map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
       legend.title = element_text(size = 14),
       legend.text = element_text(size = 11),
     )
-ggsave("~/Downloads/diet_forecast_error.png", width = 10, height = 6)
 ```
 
 ### Inference of Significant Taxa
@@ -103,12 +104,9 @@ ggsave("~/Downloads/diet_forecast_error.png", width = 10, height = 6)
 ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:3, L = 4) |>
   c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:3, L = 4))
 
-tr_fun <- function(x) {
-  mbtransfer(x, P = 3, Q = 3, verbose = FALSE)
-}
-
-staxa <- select_taxa(ts, ws[[1]], ws[[8]], tr_fun, n_splits = 20)
-#staxa <- readRDS("../data/staxa-diet.rds")
+#staxa <- select_taxa(ts, ws[[1]], ws[[8]],  \(x) mbtransfer(x, 3, 3), n_splits = 20)
+#save(staxa, file = "../../data/staxa-diet.rds")
+staxa <- readRDS("../../data/staxa-diet.rds")
 ```
 
 ```{r, fig.height = 5, fig.width = 10}
@@ -137,8 +135,6 @@ staxa$ms |>
   scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
   labs(y = expression(M[j]), x = "Taxon") +
   theme(axis.text.x = element_text(angle = 90, size = 11))
-
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/diet-mirror.png", height = 5, width = 10)
 ```
 
 * Get m's for the taxa within the selected set X
@@ -147,7 +143,7 @@ staxa$ms |>
 * Visualize the differenced trajectories, faceted by cluster
 
 ```{r}
-fit <- tr_fun(ts)
+fit <- mbtransfer(ts, 3, 3)
 ws <- steps(c("Plant" = TRUE, "Animal" = FALSE), lengths = 1:3, L = 8) |>
   c(steps(c("Plant" = FALSE, "Animal" = TRUE), lengths = 1:3, L = 8))
 
@@ -178,8 +174,6 @@ rdata |>
     axis.text.y = element_blank(),
     panel.spacing = unit(0, "line")
   )
-
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/counterfactual_diet_staxa.png", height = 5, width = 9)
 ```
 
 ```{r, fig.height = 5, fig.width = 11}
@@ -188,5 +182,4 @@ values_df |>
   group_by(taxon) |>
   mutate(value = rank(value) / n()) |>
   interaction_hm(taxa = c("Otu000011", "Otu000017", "Otu000056"), "diet")
-ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_diet.png", height = 5, width = 11)
 ```
