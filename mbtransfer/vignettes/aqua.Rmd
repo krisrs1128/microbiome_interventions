@@ -19,11 +19,11 @@ library(mbtransfer)
 library(tidyverse)
 ```
 ```{r}
-reads <- read_csv("") |>
+reads <- read_csv("https://figshare.com/ndownloader/files/40357894/reads.csv") |>
   column_to_rownames("sample")
-samples <- read_csv("") |>
-subject_data <- read_csv("")
-interventions <- read_csv("") |>
+samples <- read_csv("https://figshare.com/ndownloader/files/40357897/samples.csv")
+subject <- read_csv("https://figshare.com/ndownloader/files/40357891/subject.csv")
+interventions <- read_csv("https://figshare.com/ndownloader/files/40357888/interventions.csv") |>
   column_to_rownames("sample")
 ```
 
@@ -46,21 +46,11 @@ ws <- steps(c("pH" = TRUE, "AS" = FALSE), lengths = 4, L = 4) |>
 ws[[1]]["AS", ] <- 38
 ws[[2]]["AS", ] <- 38
 
-staxa <- select_taxa(ts[1:3], ws[[1]], ws[[2]], \(x) mbtransfer(x, 3, 3), n_splits = 20)
-save(staxa, file = "../data/staxa-aqua.rds")
-#staxa <- readRDS("../data/staxa-diet.rds")
+#staxa <- select_taxa(ts[1:3], ws[[1]], ws[[2]], \(x) mbtransfer(x, 3, 3), n_splits = 20)
+#save(staxa, file = "../data/staxa-aqua.rds")
+staxa <- readRDS("../../data/staxa-aqua.rds")
 ```
 
 Maybe show a gradually increasing trajectory?
 or better - several increasing trajectories.
 
-```{r}
-fit <- tr_fun(ts)
-ws <- steps(c("AS" = TRUE, "pH" = FALSE), lengths = 7, L = 21) |>
-  map(~ 20 * . + 20)
-ws[[1]]["pH", ] <- 6.2
-ws[[2]]["pH", ] <- 6.2
-
-# sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix = 64) |>
-#   map(~ predict(fit, .))
-```
