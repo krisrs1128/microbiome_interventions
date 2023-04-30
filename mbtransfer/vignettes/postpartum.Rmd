@@ -21,7 +21,11 @@ library(fs)
 library(tidyverse)
 library(mbtransfer)
 library(glue)
+th <- theme_bw() +
+  theme(panel.background = element_rect(fill = "transparent"))
+theme_set(th)
 ```
+
 ```{r}
 reads <- read_csv("https://figshare.com/ndownloader/files/40322782/reads.csv") |>
   column_to_rownames("sample")
@@ -45,10 +49,6 @@ interaction_barcode(values_df, taxa, "bmi_cut", width = 14)
 ```
 
 ```{r}
-tr_fun <- function(x) {
-  mbtransfer(x, P = 3, Q = 3)
-}
-
 subject_data(ts) <- subject_data(ts) |>
   select(subject, BirthControlYesNo) |>
   mutate(
@@ -57,7 +57,7 @@ subject_data(ts) <- subject_data(ts) |>
   ) |>
   select(subject, starts_with("BC"))
 
-fit <- tr_fun(ts)
+fit <- mbtransfer(ts, 3, 3)
 ```
 
 ## Smoothing and Out-of-Sample Performance
@@ -70,7 +70,6 @@ ts_preds[["in-sample"]] <- predict(fit, ts_missing)
 fit <- mbtransfer(ts[1:25], P = 3, Q = 3)
 ts_preds[["out-of-sample"]] <- predict(fit, ts_missing[26:49])
 ```
-
 
 ```{r, fig.width = 10, fig.height = 6}
 map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
@@ -97,10 +96,10 @@ map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
 
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
-staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 20)
+staxa <- select_taxa(ts, ws[[1]], ws[[2]], ~ mbtransfer(., 3, 3), n_splits = 20)
 ```
 
-```{r, fig.height = 10, fig.width = 8}
+```{r, fig.height = 5, fig.width = 10}
 staxa$ms |>
   mutate(
     taxon = taxa(ts)[taxon],
@@ -115,8 +114,6 @@ staxa$ms |>
   scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
   labs(y = expression(M[j]), x = "Taxon") +
   theme(axis.text.x = element_text(angle = 90, size = 11))
-
-#ggsave("~/Downloads/postpartum-mirror.png", height = 5, width = 10)
 ```
 
 ```{r}
@@ -133,7 +130,7 @@ for (i in 0:1) {
 }
 ```
 
-```{r}
+```{r fig.width=9, fig.height=4.5}
 focus_taxa <- c("Porphyromonas", "Lactobacillus", "Prevotella_6", "L.gasseri", "L.iners", "Atopobium")
 rdata <- sim_bc |>
   map_dfr(~ ribbon_data(.[[2]], .[[1]], focus_taxa, delta =  7), .id = "BC") |>
@@ -152,11 +149,9 @@ ribbon_plot(rdata, group = "BC") +
     axis.title = element_text(size = 12), 
     strip.text = element_text(size = 12)
   )
-
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/counterfactual_postpartum_staxa.png", width = 9, height = 4.5)
 ```
 
-```{r, fig.width = 10, fig.height = 5}
+```{r, fig.width = 10, fig.height = 4}
 values_df <- pivot_ts(ts) |>
   group_by(taxon) |>
   mutate(value = rank(value) / n()) |>
@@ -168,6 +163,4 @@ interaction_hm(values_df, vis_taxa, "BirthControlYesNo", -1, width = 14) +
     axis.text.y = element_blank(),
     strip.text = element_text(size = 12)
   )
-ggsave("~/Downloads/cover.png", dpi = 1000, width = 10, height = 4)
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/progressive_disclosure_postpartum.png", width = 10, height = 4.5)
 ```
