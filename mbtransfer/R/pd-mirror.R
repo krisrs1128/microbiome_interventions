@@ -61,13 +61,13 @@ pd_summary <- function(y0, y1, ix, summary_fun = mean) {
     apply(1:2, summary_fun)
 }
 
-pd_effects <- function(fit, ts, w0, w1, n_sample = NULL, patch_len = 8) {
+pd_effects <- function(fit, ts, w0, w1, n_sample = NULL, patch_len = 8, intervention_len = NULL) {
   if (is.null(n_sample)) {
     n_sample <- 0.5 * length(ts) * ncol(ts[[1]]) / patch_len
   }
 
   # sampled patches under two counterfactual interventions
-  ts_star <- sample_ts(ts, n_sample, patch_len) |>
+  ts_star <- sample_ts(ts, n_sample, patch_len, intervention_len = ncol(w0)) |>
     counterfactual_ts(w0, w1)
 
   # compute difference in predictions across future ix

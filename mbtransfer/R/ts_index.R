@@ -33,7 +33,7 @@ replace_subject <- function(ts, new_subject) {
 }
 
 #' @export
-sample_ts <- function(ts, n, patch_len = 5) {
+sample_ts <- function(ts, n, patch_len = 5, intervention_len = NULL) {
   # randomly subset series
   weights <- map_dbl(ts, ncol)
   weights <- weights / sum(weights)
@@ -42,8 +42,10 @@ sample_ts <- function(ts, n, patch_len = 5) {
   
   # randomly subset windows
   for (i in seq_along(ts_star)) {
-    start_ix <- sample(seq_len(ncol(ts_star[[i]]) - patch_len + 1), 1)
-    ts_star[[i]] <- ts_star[[i]][, seq(start_ix, start_ix + patch_len - 1)]
+    start_ix <- sample(seq_len(ncol(ts_star[[i]]) - patch_len), 1)
+    tmp <- ts_star[[i]]@time[seq(start_ix, start_ix + patch_len + intervention_len)]
+    ts_star[[i]] <- ts_star[[i]][, seq(start_ix, start_ix + patch_len)]
+    ts_star[[i]]@time <- tmp
   }
   
   ts_star
