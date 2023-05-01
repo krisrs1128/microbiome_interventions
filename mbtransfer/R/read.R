@@ -43,7 +43,10 @@ ts_to_dfs <- function(ts) {
   }
   
   reads <- do.call(cbind, map(ts, ~ values(.)))
-  interventions <- do.call(cbind, map(ts, ~ interventions(.)))
+  interventions <- do.call(cbind, map(ts, ~ interventions(.))) |>
+    t() |>
+    as.data.frame() |>
+    rownames_to_column("sample")
   metadata <- map_dfr(ts, ~ tibble(sample = colnames(values(.)), time = .@time), .id = "subject")
   
   list(
@@ -67,5 +70,6 @@ pivot_ts <- function(ts) {
  
   reads |>
     left_join(dfs$metadata) |>
+    left_join(dfs$interventions) |>
     left_join(dfs$subject)
 }

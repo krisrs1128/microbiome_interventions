@@ -78,17 +78,20 @@ staxa$ms |>
 ```
 
 ```{r}
-ws <- steps(c("pH" = TRUE, "AS" = FALSE), lengths = 4, L = 45) |>
-  map(~ 2 * . + 5)
-ws[[1]]["AS", ] <- 38
-ws[[2]]["AS", ] <- 38
+L <- 45
+ws <- list()
+for (l in seq_len(10)) {
+  ws[[l]] <- matrix(38, nrow = 2, ncol = L)
+  colnames(ws[[l]]) <- glue("t{seq_len(L)}")
+  rownames(ws[[l]]) <- c("pH", "AS")
+  ws[[l]][1, ] <- c(seq(5, 9, length.out = 3 * l), rep(9, L - 3 * l))
+}
 
 sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix = 45) |>
   map(~ mbtransfer_predict(fit, .))
 
 focus_taxa <- unlist(map(staxa$taxa, ~ c(.)))
 rdata <- ribbon_data(sim_ts[[2]], sim_ts[[1]], focus_taxa)
-
 ```
 
 ```{r}
