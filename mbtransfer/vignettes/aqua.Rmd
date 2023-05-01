@@ -34,7 +34,7 @@ ts <- reads |>
 ```
 
 ```{r, eval=F}
-ts_missing <- subset_values(ts, 1:8)
+ts_missing <- subset_values(ts, 1:96)
 fit <- mbtransfer(ts, P = 3, Q = 3)
 ts_pred <- predict(fit, ts_missing)
 ```
@@ -52,3 +52,59 @@ staxa <- readRDS("../../data/staxa-aqua.rds")
 
 Maybe show a gradually increasing trajectory?
 or better - several increasing trajectories.
+
+```{r, fig.height = 5, fig.width = 10}
+vis_otus <- staxa$ms |>
+  group_by(taxon) |>
+  summarise(m = mean(m)) |>
+  slice_max(m, n = 50) |>
+  pull(taxon)
+
+staxa$ms |>
+  filter(taxon %in% vis_otus) |>
+  mutate(
+    taxon = taxa(ts)[taxon],
+    lag = as.factor(lag),
+    selected = ifelse(taxon %in% unlist(staxa$taxa), "Selected", "Unselected")
+  ) |>
+  ggplot() +
+  geom_hline(yintercept = 0, size = 2, col = "#d3d3d3") +
+  geom_boxplot(aes(reorder(taxon, -m), m, fill = lag, col = lag), alpha = 0.8) +
+  facet_grid(. ~ selected, scales = "free_x", space = "free_x") +
+  scale_fill_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  scale_color_manual(values = c("#c6dbef", "#6baed6", "#2171b5", "#084594")) +
+  labs(y = expression(M[j]), x = "Taxon") +
+  theme(axis.text.x = element_text(angle = 90, size = 11))
+```
+
+```{r}
+ws <- steps(c("pH" = TRUE, "AS" = FALSE), lengths = 4, L = 45) |>
+  map(~ 2 * . + 5)
+ws[[1]]["AS", ] <- 38
+ws[[2]]["AS", ] <- 38
+
+sim_ts <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix = 45) |>
+  map(~ mbtransfer_predict(fit, .))
+
+focus_taxa <- unlist(map(staxa$taxa, ~ c(.)))
+rdata <- ribbon_data(sim_ts[[2]], sim_ts[[1]], focus_taxa)
+
+```
+
+```{r}
+ts_df <- pivot_ts(ts)
+
+taxa_order <- staxa$ms |>
+  group_by(taxon) |>
+  summarise(median_m = median(m)) |>
+  arrange(-median_m) |>
+  pull(taxon)
+
+ts_df |>
+  mutate(taxon = factor(taxon, levels = taxa(ts)[taxa_order])) |>
+  filter(taxon %in% focus_taxa, taxon %in% taxa(ts)[vis_otus]) |>
+  ggplot() +
+  geom_point(aes(pH, value), alpha = 0.6, size = 0.8) +
+  facet_wrap(~ taxon)
+```
+
