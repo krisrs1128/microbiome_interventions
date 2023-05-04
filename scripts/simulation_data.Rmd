@@ -65,7 +65,7 @@ number of successes before we stop.
 ```{r}
 step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C))
 theta0 <- matrix(2, n_taxa, n_lag + 1)
-w <- random_interventions(n_perturb, n_time, n_lag)
+w <- random_interventions(n_perturb, n_time, n_subject, n_lag)
 z <- matnorm(n_subject, n_covariates)
 
 sizes <- runif(n_taxa, 1, 5)
