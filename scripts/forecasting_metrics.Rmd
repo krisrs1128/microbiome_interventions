@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 24
+  run_id: 1
 ---
 
 ```{r setup, include=FALSE}
@@ -19,6 +19,7 @@ library(fs)
 library(tidyverse)
 library(mbtransfer)
 library(mdsine)
+library(fido2)
 library(tfPaper)
 set.seed(20230412)
 ```
@@ -71,11 +72,16 @@ tr_fun <- function(method, hyper = list()) {
       mdsine(ts, hyper$taxonomy)
     } else if (method == "mbtransfer") {
       mbtransfer(ts, P = hyper$P, Q = hyper$Q)
+    } else if (method == "fido") {
+      fido(ts, sigma = hyper$sigma, rho = hyper$rho)
     }
   }
 }
 
-result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
+#result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
+hyper$sigma <- 1
+hyper$rho <- 2
+result <- cross_validate(ts, tr_fun("fido", hyper), K = 4)
 metrics <- result$metrics
 ```
 
