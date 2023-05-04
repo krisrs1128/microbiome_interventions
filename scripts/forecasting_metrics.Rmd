@@ -79,8 +79,7 @@ tr_fun <- function(method, hyper = list()) {
 }
 
 #result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
-hyper$sigma <- 1
-hyper$rho <- 2
+hyper <- list(sigma = 1, rho = 1)
 result <- cross_validate(ts, tr_fun("fido", hyper), K = 4)
 metrics <- result$metrics
 ```
