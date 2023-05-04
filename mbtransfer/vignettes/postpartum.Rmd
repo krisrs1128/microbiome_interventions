@@ -16,15 +16,61 @@ knitr::opts_chunk$set(
 )
 ```
 
+### Data and Problem Context
+
+```{r, echo = FALSE}
+library(RefManageR)
+bib <- ReadBib("references.bib")
+```
+
+How does birth influence the composition of the vaginal microbiome? This
+question was first studied by `r Citep("Costello2022LongitudinalDO")`, who made
+their data available in [this repository](https://purl.stanford.edu/pz745bc9128). We will re-analyze these
+data using `mbtransfer`, viewing birth as an intervention event with the
+capacity to remodel microbial community composition. We'll illustrate the following workflow:
+
+* Construct a `ts_inter` ("time series intervention") object, which is the
+expected input of our main `mbtransfer` modeling function.
+* Evaluate the in- and out-of-sample prediction performance of our model.
+* Select significant taxa using mirror statistics.
+* Visualize hypothetical trajectories for significant taxa, with an emphasis on
+potential interactions with subject-level features.
+
+The first three steps nearly parallel those for the diet and aquaculture studies
+discussed in the other vignettes, but the third follows an implementation
+specific to this problem context.
+
 ```{r}
 library(fs)
 library(tidyverse)
 library(mbtransfer)
 library(glue)
 th <- theme_bw() +
-  theme(panel.background = element_rect(fill = "transparent"))
+  theme(
+    panel.background = element_rect(fill = "transparent"),
+    plot.background = element_rect(fill = "transparent")
+  )
 theme_set(th)
 ```
+
+To construct as `ts_inter` object, we combine the following datasets:
+
+* `reads`: A `data.frame` of taxonomic compositions. Rows are samples and columns
+are taxa.
+* `samples`: A `data.frame` of sample-level descriptors. This is expected to have
+`sample` and `time` columns. `sample` must match the rownames across `reads` and
+`interventions`.
+* `subject_data`: A `data.frame` of subject-level descriptors. This can be used
+to store information that is not time varying.
+* `interventions`: A `data.frame` of whose  rows are samples and columns are
+interventions. This can be either a binary matrix of whether a given
+intervention (column) was present in a sample. An input series can
+also be continuously valued -- see the aquaculture vignette ofr an example.
+
+We created these datasets by lightly processing the raw data from the published
+repository. Our processing script is available here. Note that we converted all
+the subject-level data to numeric variables -- `mbtransfer` does not know how to
+handle factor inputs, so they must first be coded.
 
 ```{r}
 reads <- read_csv("https://figshare.com/ndownloader/files/40322782/reads.csv") |>
@@ -35,41 +81,84 @@ interventions <- read_csv("https://figshare.com/ndownloader/files/40322770/inter
   column_to_rownames("sample")
 ```
 
+Note that, unlike most microbiome studies, these data has relatively few taxa
+(29). This reflects the typically low diversity of the vaginal microbiome.
+
+Next, we will construct a `ts_inter` object using the `ts_from_dfs` function.
+In their initial form, the samples are not evenly sampled -- we generally have
+biweekly sampling, but daily resolution is available in the period immediately
+surrounding birth. 0 indicates the birth timepoint, samples with negative
+timepoints were collected before birth. Our method is not able to handle
+nonuniform temporal sampling, unfortunately, so we downsample to biweekly (14
+day) resolution using the `interpolate` function.
+
 ````{r}
 ts <- reads |>
  ts_from_dfs(interventions, samples, subject_data) |>
  interpolate(delta = 14, method = "linear")
 ```
+Now that we have constructed our interpolated `ts_inter` object, it can be
+helpful to visualize the subject trajectories. We can use `pivot_ts` to convert
+the `ts_inter` object into a merged `data.frame`, and `interaction_barcode`
+creates a faceted plot for selected taxa. Each row below is the trajectory for
+one taxon from one subject. Multiple taxa for each subject are grouped into the
+same facet (for an alternative which groups subjects according to taxa, see the
+`interaction_hm` function). We've further grouped subjects according to their
+contraception status.
 
 ```{r, fig.height = 12, fig.width = 6}
 values_df <- pivot_ts(ts)
 taxa <- c("Lactobacillus", "Prevotella")
 interaction_barcode(values_df, taxa, "BirthControlYesNo", width = 14)
-interaction_barcode(values_df, taxa, "bmi_cut", width = 14)
 ```
 
-```{r}
-subject_data(ts) <- subject_data(ts) |>
-  select(subject, BirthControlYesNo) |>
-  mutate(
-    BCYes = 1 * (BirthControlYesNo == "Yes"),
-    BCNo = 1 * (BirthControlYesNo == "No")
-  ) |>
-  select(subject, starts_with("BC"))
+## Prediction
 
-fit <- mbtransfer(ts, 3, 3)
+We'll now fit and evaluate some `mbtransfer` models. We consider two fits -- one
+which uses all the subjects, and another that estimates using 25/49 of them. In
+both models, we use taxonomic (`P`) and intervention (`Q`) lags of three
+timepoints. In these data, that means we can look 6 weeks into the past to
+predict current microbiome composition.
+
+The model that uses all samples gives us a sense of the flexibility of the
+approach. If we think of the model as a denoiser / smoothing according to a
+subset of predictor composition, intervention, and subject descriptors, how
+closely can we predict community change? The second model gives us a sense of
+how well this model might generalize to new subjects. This is a harder question,
+because microbiome data tends to exhibit high subject-to-subject variability.
+That said, taxa which are predictable out-of-sample are worth noting, since
+their effects may be more general.
+
+```{r}
+fits <- list()
+fits[["in-sample"]] <- mbtransfer(ts, P = 3, Q = 3)
+fits[["out-of-sample"]] <- mbtransfer(ts[1:25], P = 3, Q = 3)
 ```
 
-## Smoothing and Out-of-Sample Performance
+The block below computes the in and out of sample prediction errors
+corresponding to these two models. On test samples, we are allowed to look at
+timepoints up to week 12. We stop here because some samples have birth events
+starting on week 13, and we want to predict the effect of an intervention from
+before any have occurred. 
+
+By default, the predict function will fill in any timepoints that are present in
+the `intervention` but not the abundance `values` slot of each `ts_inter`
+element. This means that we will extrapolate starting from timepoint all the way
+to the end of sampling (roughly, 35 - 45 samples total). Below, we will compare
+predictions across different time horizons. Since running inference can take
+time, one simple way to speed up `mbtransfer` is to request predictions across
+shorter time horizons (e.g., by reducing the number of columns in the
+`interventions` slot).
 
 ```{r}
-ts_missing <- subset_values(ts, 1:6)
 ts_preds <- list()
-ts_preds[["in-sample"]] <- predict(fit, ts_missing)
-
-fit <- mbtransfer(ts[1:25], P = 3, Q = 3)
-ts_preds[["out-of-sample"]] <- predict(fit, ts_missing[26:49])
+ts_missing <- subset_values(ts, 1:12)
+ts_preds[["in-sample"]] <- predict(fits[["in-sample"]], ts_missing)
+ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[26:49])
 ```
+
+We compare the true vs. predicted abundances in the block below. Samples with
+more accurate predictions lie nearer to the diagonal.
 
 ```{r, fig.width = 10, fig.height = 6}
 map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
@@ -94,6 +183,8 @@ map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
     )
 ```
 
+### Selecting Taxa with Strong Effects
+
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
 staxa <- select_taxa(ts, ws[[1]], ws[[2]], ~ mbtransfer(., 3, 3), n_splits = 20)
@@ -115,6 +206,8 @@ staxa$ms |>
   labs(y = expression(M[j]), x = "Taxon") +
   theme(axis.text.x = element_text(angle = 90, size = 11))
 ```
+
+### Comparing Counterfactual Trajectories
 
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2, L = 10)
