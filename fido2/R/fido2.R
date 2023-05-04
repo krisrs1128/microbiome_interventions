@@ -3,53 +3,44 @@
 #' @param object a fitted object of class inheriting from "fido::basset".
 #' @param newdata a ts_inter in which to look for variables with which to predict. 
 #' @param design 
+#' @importFrom fido predict alrInv
 #' @export
 fido_predict <- function(object, 
                          newdata, 
-                         design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")){
+                         #design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")){
+                         design = "~ time") {
   
   data <- fido_data(newdata)
-  
-  
-  X_predict <- t(
-    model.matrix(formula(design), data=data$samples
-    )
-  )
-  predicted <- fido::predict(object, X_predict)
-  
-  # compute median of 2000 iteration
+  X_predict <- t(model.matrix(formula(design), data=data$samples))
+
+  predicted <- predict(object, X_predict)
   pred_median_alr <- apply(predicted, c(1,2), median)# taxa-1 x time
-  
   pred_median_invalr <- alrInv(t(pred_median_alr)) |> 
     t()
-  # library_size <- colSums(Y)
+
   library_size <- colSums(data$Y)
-  
   y_hat <- t(t(pred_median_invalr)*library_size) |> round(digits = 0)
-  
-  
   colnames(y_hat) <- colnames(data$Y)
   rownames(y_hat) <- rownames(data$Y)
   
   data$Y <- y_hat
   
-  ts_pred <- ts_from_dfs(
+  ts_from_dfs(
     reads = data$Y |> t(), 
     interventions = data$interventions |> column_to_rownames("sample"), 
     metadata = data$samples, 
-    subject_data = data$samples[, colnames(newdata@subject_data)])
-  
-  return(ts_pred)
+    subject_data = data$samples[, colnames(newdata@subject_data)]
+  )
 }
 
-#' @import fido 
+#' @importFrom fido basset
 #' @export
 fido <- function(
     ts, 
     sigma, 
     rho, 
-    design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")
-){
+    design = "~ time") {
+    #design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")
   dat <- fido_data(ts)
   Y <- dat$Y
   D <- nrow(Y) # taxa
@@ -73,13 +64,23 @@ fido <- function(
   Xi <- matrix(.4, D-1, D-1)
   
   diag(Xi) <- 1
-  
-  fit <- fido::basset(Y, X, upsilon, Theta, Gamma, Xi)
-  
-  return(fit)
+  fit <- basset(Y, X, upsilon, Theta, Gamma, Xi, n_samples = 0, verbose = TRUE, calcGradHess = FALSE)
+  new("fido_model", parameters = fit, method = "fido", hyper = list(sigma = sigma, rho = rho))
 }
 
+setClass(
+  "fido_model",
+  slots = c(
+    parameters = "ANY",
+    method = "character",
+    hyper = "list"
+  )
+)
 
+#' @export
+setMethod("predict",  c(object = "fido_model"), fido_predict)
+
+#' @importFrom fido SE
 #' @export
 Gamma_ <- function(X, sigma, rho) {
   ## here we are assuming RBF kernel over time
