@@ -91,6 +91,14 @@ download.file("https://g-5b2b0e.dtn.globus.wisc.edu/microbiome_interventions/dat
 load(source_path)
 ```
 
+Any variables (aside from subject ID) in the `subject_data` slot of the
+`ts_inter` object will be used as covariates, along with the taxonomic read
+counts and intervention status. Many of the sample descriptors are not
+appropriate for modeling (e.g., ID variables), and we will focus only one
+whether the woman used contraception following birth. This variable was
+discussed as potentially influence Lactobacillus recovery in the original
+publication. 
+
 ```{r}
 post.df <- post.df |>
   filter(PregOut != "Miscarriage", MonVsDel %in% -7:13, LibrarySize >= 4e4) |>
