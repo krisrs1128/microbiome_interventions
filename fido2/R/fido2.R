@@ -9,11 +9,10 @@ fido_predict <- function(object,
                          newdata, 
                          #design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")){
                          design = "~ time") {
-  
   data <- fido_data(newdata)
   X_predict <- t(model.matrix(formula(design), data=data$samples))
 
-  predicted <- predict(object, X_predict)
+  predicted <- predict(object@parameters, X_predict)
   pred_median_alr <- apply(predicted, c(1,2), median)# taxa-1 x time
   pred_median_invalr <- alrInv(t(pred_median_alr)) |> 
     t()
@@ -129,7 +128,8 @@ fido_data <- function(
     data$samples[[i]] <- tibble(
       sample = colnames(values(ts_inter[[i]])),
       subject = ts_inter@subject_data$subject[i],
-      time = ts_inter[[i]]@time)
+      time = ts_inter[[i]]@time[seq_len(ncol(ts_inter[[i]]))]
+    )
     
     data$interventions[[i]] <- interventions(ts_inter[[i]])[,colnames(values(ts_inter[[i]])), drop = FALSE] |> 
       t() |>
@@ -152,11 +152,6 @@ fido_data <- function(
     left_join(ts_inter@subject_data) |>
     left_join(data$interventions)
   
-  # # D - numer of taxa
-  # D <- nrow(data$Y)
-  # # N - number of samples
-  # N <- ncol(data$Y)
-  
-  return(data)
+  data
 }
 
