@@ -115,7 +115,7 @@ random_step <- function(n_taxa, n_perturb, n_lag, lower = .1, upper = 1) {
 }
 
 #' @export
-random_interventions <- function(n_perturb, n_time, n_lag = 3) {
+random_interventions <- function(n_perturb, n_time, n_subject, n_lag = 3) {
   w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
   for (i in seq_along(w)) {
     for (j in seq_len(n_perturb)) {
