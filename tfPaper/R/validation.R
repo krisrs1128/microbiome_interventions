@@ -25,9 +25,12 @@ evaluation <- function(y, y_hat, test_ix) {
 
   for (i in seq_along(y)) {
     test_ix[[i]] <- intersect(test_ix[[i]], seq_len(ncol(y_hat[[i]])))
-    if (length(test_ix) == 0) next
+    if (length(test_ix[[i]]) == 0) {
+      residuals[[i]] <- rep(NA, nrow(y_hat[[i]]))
+    } else {
+      residuals[[i]]<- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
+    }
 
-    residuals[[i]]<- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
     avg_err[[i]] <- data.frame(
       mse = mean(residuals[[i]] ^ 2),
       mae = mean(abs(residuals[[i]])),
@@ -39,6 +42,9 @@ evaluation <- function(y, y_hat, test_ix) {
   bind_rows(avg_err, .id = "subject")
 }
 
+# #' @importFrom mbtransfer predict
+# #' @importFrom mdsine predict
+# #' @importFrom fido2 predict
 #' @importFrom dplyr bind_rows
 #' @importFrom tidyr separate
 #' @export
@@ -61,6 +67,7 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1, see
     for (i in seq_along(stest)) {
       t_starts[i] <- intervention_start(interventions(stest[[i]]), offset)
       values(stest[[i]]) <- values(stest[[i]])[, seq_len(t_starts[i]), drop = FALSE]
+
       predict_ix <- seq_len(min(t_starts[i] + n_ahead, ncol(splits$test[[i]])))
       interventions(stest[[i]]) <- interventions(stest[[i]])[, predict_ix, drop = FALSE]
       stest[[i]]@time <- stest[[i]]@time[predict_ix]

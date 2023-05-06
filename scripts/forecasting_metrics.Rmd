@@ -38,9 +38,7 @@ configurations <- configurations |>
   left_join(data_config) |>
   filter(!(method == "mdsine" & n_taxa > 100))
 
-#attach(as.list(configurations[params$run_id, ]))
-attach(as.list(configurations[71, ]))
-#attach(as.list(configurations[74, ]))
+attach(as.list(configurations[params$run_id, ]))
 
 if (method == "mbtransfer") {
   predict <- mbtransfer::predict
@@ -90,7 +88,7 @@ metrics <- result$metrics
 
 ```{r}
 ggplot(metrics) +
- geom_boxplot(aes(lag, mae))
+  geom_boxplot(aes(lag, mae))
 ```
 
 We can evaluate the overall training time.
@@ -102,8 +100,6 @@ time_diff <- Sys.time() - start
 ```
 
 ```{r save_results}
-#hyper <- list(sigma = 1, rho = 1)
-#result <- cross_validate(ts, tr_fun("fido", hyper), K = 4)
 save(metrics, time_diff, fit, file = output_path)
 ```
 
