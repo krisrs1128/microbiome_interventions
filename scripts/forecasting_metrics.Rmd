@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 1
+  run_id: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -17,10 +17,10 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(glue)
 library(fs)
 library(tidyverse)
-library(mbtransfer)
-library(mdsine)
-library(fido2)
 library(tfPaper)
+library(mdsine)
+library(mbtransfer)
+library(fido2)
 set.seed(20230412)
 ```
 
@@ -38,7 +38,13 @@ configurations <- configurations |>
   left_join(data_config) |>
   filter(!(method == "mdsine" & n_taxa > 100))
 
-attach(as.list(configurations[params$run_id, ]))
+#attach(as.list(configurations[params$run_id, ]))
+attach(as.list(configurations[71, ]))
+#attach(as.list(configurations[74, ]))
+
+if (method == "mbtransfer") {
+  predict <- mbtransfer::predict
+}
 ```
 
 This script doesn't presume to know which input datasets are to be considered.
@@ -78,9 +84,7 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
-#result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
-hyper <- list(sigma = 1, rho = 1)
-result <- cross_validate(ts, tr_fun("fido", hyper), K = 4)
+result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
 metrics <- result$metrics
 ```
 
@@ -89,7 +93,7 @@ ggplot(metrics) +
  geom_boxplot(aes(lag, mae))
 ```
 
-we can evaluate the overall training time
+We can evaluate the overall training time.
 
 ```{r compute_time}
 start <- Sys.time()
@@ -98,6 +102,8 @@ time_diff <- Sys.time() - start
 ```
 
 ```{r save_results}
+#hyper <- list(sigma = 1, rho = 1)
+#result <- cross_validate(ts, tr_fun("fido", hyper), K = 4)
 save(metrics, time_diff, fit, file = output_path)
 ```
 
