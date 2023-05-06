@@ -3,9 +3,9 @@
 #' @importFrom glue glue
 #' @importFrom xgboost xgboost
 #' @export
-mbtransfer <- function(ts_inter, P = 1, Q = 1, nrounds = 200, 
-                       early_stopping_rounds = 5, verbose = 0, max_depth = 3, 
-                       eta = 0.1, subsample = 0.5, ...) {
+mbtransfer <- function(ts_inter, P = 1, Q = 1, nrounds = 1000,
+                       early_stopping_rounds = 5, verbose = 0, max_depth = 2,
+                       eta = 0.05, ...) {
   train_data <- patchify_df(ts_inter, P, Q)
   fit <- list()
 

@@ -7,7 +7,7 @@
 #' @export
 fido_predict <- function(object, 
                          newdata, 
-                         design = "~ time + P1") {
+                         design = "~ time + P1 + V1") {
   data <- fido_data(newdata)
   X_predict <- t(model.matrix(formula(design), data=data$samples))
 
@@ -21,13 +21,18 @@ fido_predict <- function(object,
   colnames(y_hat) <- data$samples$sample
   rownames(y_hat) <- rownames(data$Y)
   
-  browser()
-  test2 <- ts_from_dfs(
+  ts <- ts_from_dfs(
     reads = t(y_hat),
     interventions = data$interventions |> column_to_rownames("sample"), 
     metadata = data$samples, 
     subject_data = unique(data$samples[, colnames(newdata@subject_data)])
   )
+
+  for (i in seq_along(ts)) {
+    colnames(interventions(ts[[i]])) <- colnames(values(ts[[i]]))
+  }
+
+  ts
 }
 
 #' @importFrom fido basset
@@ -36,7 +41,7 @@ fido <- function(
     ts, 
     sigma, 
     rho, 
-    design = "~ time + P1") {
+    design = "~ time + P1 + V1") {
   dat <- fido_data(ts)
   Y <- dat$Y
   D <- nrow(Y) # taxa
@@ -55,7 +60,7 @@ fido <- function(
   Xi <- matrix(.4, D-1, D-1)
   diag(Xi) <- 1
 
-  fit <- basset(Y, X, upsilon, Theta, Gamma, Xi, n_samples = 10, verbose = TRUE)
+  fit <- basset(Y, X, upsilon, Theta, Gamma, Xi, verbose = TRUE, n_samples = 0, calcGradHess = FALSE)
   new("fido_model", parameters = fit, method = "fido", hyper = list(sigma = sigma, rho = rho))
 }
 
