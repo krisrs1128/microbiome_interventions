@@ -5,7 +5,7 @@
 export batch_size=10
 tar -zxvf microbiome_interventions.tar.gz
 cd microbiome_interventions
-Rscript -e "purrr::map(c('mbtransfer', 'mdsine', 'tfPaper'), devtools::install)"
+Rscript -e "purrr::map(c('mbtransfer', 'mdsine', 'tfPaper', 'fido'), devtools::install)"
 Rscript -e "mdsine::install_mdsine()"
 
 # copy over data  
