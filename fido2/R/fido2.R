@@ -7,8 +7,7 @@
 #' @export
 fido_predict <- function(object, 
                          newdata, 
-                         #design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")){
-                         design = "~ time") {
+                         design = "~ time + P1") {
   data <- fido_data(newdata)
   X_predict <- t(model.matrix(formula(design), data=data$samples))
 
@@ -18,17 +17,16 @@ fido_predict <- function(object,
     t()
 
   library_size <- colSums(data$Y)
-  y_hat <- t(t(pred_median_invalr)*library_size) |> round(digits = 0)
-  colnames(y_hat) <- colnames(data$Y)
+  y_hat <- t(t(pred_median_invalr)*library_size)
+  colnames(y_hat) <- data$samples$sample
   rownames(y_hat) <- rownames(data$Y)
   
-  data$Y <- y_hat
-  
-  ts_from_dfs(
-    reads = data$Y |> t(), 
+  browser()
+  test2 <- ts_from_dfs(
+    reads = t(y_hat),
     interventions = data$interventions |> column_to_rownames("sample"), 
     metadata = data$samples, 
-    subject_data = data$samples[, colnames(newdata@subject_data)]
+    subject_data = unique(data$samples[, colnames(newdata@subject_data)])
   )
 }
 
@@ -38,17 +36,12 @@ fido <- function(
     ts, 
     sigma, 
     rho, 
-    design = "~ time") {
-    #design = paste0("~", "time", "+", "as.integer(as.factor(subject))","-1")
+    design = "~ time + P1") {
   dat <- fido_data(ts)
   Y <- dat$Y
   D <- nrow(Y) # taxa
   N <- ncol(Y)
- 
-  X <-  t(
-    model.matrix(formula(design), data=dat$samples
-    )
-  )
+  X <- t(model.matrix(formula(design), data=dat$samples))
   
   Gamma <- function(X){
     Gamma_(X, sigma = sigma, rho = rho)
@@ -59,11 +52,10 @@ fido <- function(
   }
   
   upsilon <- D-1+3
-  
   Xi <- matrix(.4, D-1, D-1)
-  
   diag(Xi) <- 1
-  fit <- basset(Y, X, upsilon, Theta, Gamma, Xi, n_samples = 0, verbose = TRUE, calcGradHess = FALSE)
+
+  fit <- basset(Y, X, upsilon, Theta, Gamma, Xi, n_samples = 10, verbose = TRUE)
   new("fido_model", parameters = fit, method = "fido", hyper = list(sigma = sigma, rho = rho))
 }
 
@@ -97,18 +89,11 @@ Theta_ <- function(X, D){
   matrix(0, D-1, ncol(X))
 }
 
-
-
 #' @importFrom tibble as_tibble
 #' @importFrom dplyr bind_rows
 #' @importFrom purrr reduce
 #' @export
-fido_data <- function(
-    ts_inter, 
-    taxonomy=NULL, 
-    subject_names=NULL
-){
-  
+fido_data <- function(ts_inter, subject_names=NULL){
   if (is.null(ts_inter@subject_data)) {
     subject_names <- str_c("S", seq_along(ts_inter))
   }
@@ -126,15 +111,15 @@ fido_data <- function(
       as_tibble()
     
     data$samples[[i]] <- tibble(
-      sample = colnames(values(ts_inter[[i]])),
+      sample = colnames(interventions(ts_inter[[i]])),
       subject = ts_inter@subject_data$subject[i],
-      time = ts_inter[[i]]@time[seq_len(ncol(ts_inter[[i]]))]
+      time = ts_inter[[i]]@time
     )
     
-    data$interventions[[i]] <- interventions(ts_inter[[i]])[,colnames(values(ts_inter[[i]])), drop = FALSE] |> 
+    data$interventions[[i]] <- interventions(ts_inter[[i]]) |>
       t() |>
       as_tibble() |>
-      mutate(sample = colnames(values(ts_inter[[i]]))) |>
+      mutate(sample = colnames(interventions(ts_inter[[i]]))) |>
       column_to_rownames("sample")
   }
   
