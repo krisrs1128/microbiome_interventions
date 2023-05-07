@@ -1,5 +1,5 @@
 universe = docker
-docker_image = krisrs1128/mi:20230411
+docker_image = krisrs1128/mi:20230506
 log = /home/ksankaran/logs/mi-f-$(Process).log
 error = /home/ksankaran/logs/mi-f-$(Process).err
 output = /home/ksankaran/logs/mi-f-$(Process).out
