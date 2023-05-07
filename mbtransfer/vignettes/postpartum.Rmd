@@ -79,6 +79,7 @@ samples <- read_csv("https://figshare.com/ndownloader/files/40322776/samples.csv
 subject_data <- read_csv("https://figshare.com/ndownloader/files/40322773/subject.csv")
 interventions <- read_csv("https://figshare.com/ndownloader/files/40322770/interventions.csv") |>
   column_to_rownames("sample")
+
 ```
 
 Note that, unlike most microbiome studies, these data has relatively few taxa
@@ -130,6 +131,10 @@ That said, taxa which are predictable out-of-sample are worth noting, since
 their effects may be more general.
 
 ```{r}
+subject_data(ts) <- subject_data(ts) |>
+  select(subject, BirthControlYesNo) |>
+  mutate(BirthControlYesNo = ifelse(BirthControlYesNo == "Yes", 1, 0))
+
 fits <- list()
 fits[["in-sample"]] <- mbtransfer(ts, P = 3, Q = 3)
 fits[["out-of-sample"]] <- mbtransfer(ts[1:25], P = 3, Q = 3)
@@ -216,15 +221,15 @@ start_ix <- map_dbl(ts, ~ min(which(.@time >= -14))) - 1
 sim_bc <- list()
 for (i in 0:1) {
   bc <- subject_data(ts) |>
-    mutate(BCYes = rep(i, n()), BCNo = rep(1 - i, n()))
+    mutate(BirthControlYesNo = rep(i, n()))
   sim_bc[[i + 1]] <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix) |>
     map(~ replace_subject(., bc)) |>
-    map(~ predict(fit, .))
+    map(~ predict(fits[["in-sample"]], .))
 }
 ```
 
 ```{r fig.width=9, fig.height=4.5}
-focus_taxa <- c("Porphyromonas", "Lactobacillus", "Prevotella_6", "L.gasseri", "L.iners", "Atopobium")
+focus_taxa <- c("Porphyromonas", "Lactobacillus", "Prevotella_6", "L.jensenii", "L.iners", "Atopobium")
 rdata <- sim_bc |>
   map_dfr(~ ribbon_data(.[[2]], .[[1]], focus_taxa, delta =  7), .id = "BC") |>
   mutate(
@@ -248,6 +253,7 @@ ribbon_plot(rdata, group = "BC") +
 values_df <- pivot_ts(ts) |>
   group_by(taxon) |>
   mutate(value = rank(value) / n()) |>
+  select(-BirthControlYesNo) |>
   left_join(subject_data)
 
 vis_taxa <- c("Lactobacillus", "L.iners", "Porphyromonas", "Prevotella_6")
