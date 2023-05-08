@@ -18,6 +18,7 @@ install_mdsine <- function(envname = "mdsine") {
   md_dir <- path(tempdir())
   download.file("https://github.com/krisrs1128/MDSINE2/archive/refs/heads/master.zip", md_dir / "mdsine2.zip")
   unzip(md_dir / "mdsine2.zip")
+  system(glue("{path} -m pip install numpy=1.19"))
   system(glue("{path} -m pip install MDSINE2-master/"))
 }
 
