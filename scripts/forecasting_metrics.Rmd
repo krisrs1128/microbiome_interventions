@@ -42,6 +42,8 @@ attach(as.list(configurations[params$run_id, ]))
 
 if (method == "mbtransfer") {
   predict <- mbtransfer::predict
+} else if (method == "mdsine") {
+  predit <- mdsine::predict
 }
 ```
 
