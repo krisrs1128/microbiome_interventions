@@ -70,7 +70,7 @@ interaction_barcode <- function(values_df, taxa, condition = NULL, r = 0, ...) {
 
 #' @importFrom dplyr filter group_by summarise
 #' @export
-ribbon_data <- function(ts1, ts0, focus_taxa = NULL, delta = NULL) {
+ribbon_data <- function(ts1, ts0, focus_taxa = NULL, delta = NULL, q_lower = 0.25, q_upper = 0.75) {
   result <- (ts1 - ts0) |>
     pivot_ts()
     
@@ -85,9 +85,9 @@ ribbon_data <- function(ts1, ts0, focus_taxa = NULL, delta = NULL) {
   result |>
     group_by(taxon, time) |>
     summarise(
-      q25 = quantile(value, 0.25),
+      q_lower = quantile(value, q_lower),
       median = median(value),
-      q75 = quantile(value, 0.75)
+      q_upper = quantile(value, q_upper)
     )
 }
 
@@ -103,13 +103,13 @@ ribbon_plot <- function(rdata, group = NULL, reorder_var = NULL) {
   # filled or grey ribbons
   if (!is.null(group)) {
     p <- p + 
-      geom_ribbon(aes(ymin = q25, ymax = q75, fill = .data[[group]], group = .data[[group]]), alpha = 0.6) +
+      geom_ribbon(aes(ymin = q_lower, ymax = q_upper, fill = .data[[group]], group = .data[[group]]), alpha = 0.6) +
       geom_line(aes(y = median, col = .data[[group]], group = .data[[group]]), size = 1) +
       scale_fill_brewer(palette = "Set2") +
       scale_color_brewer(palette = "Set2")
   } else {
     p <- p + 
-      geom_ribbon(aes(ymin = q25, ymax = q75), fill = "#d3d3d3") +
+      geom_ribbon(aes(ymin = q_lower, ymax = q_upper), fill = "#d3d3d3") +
       geom_line(aes(y = median), col = "#8e8e8e", size = 1)
   }
   
