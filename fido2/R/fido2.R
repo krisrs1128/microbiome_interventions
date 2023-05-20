@@ -7,8 +7,10 @@
 #' @export
 fido_predict <- function(object, 
                          newdata, 
-                         design = "~ time + P1 + V1") {
+                         design = "~ time + P1 + V1 + subject") {
   data <- fido_data(newdata)
+  data$samples <- data$samples |>
+    mutate(subject = as.integer(as.factor(subject)))
   X_predict <- t(model.matrix(formula(design), data=data$samples))
 
   predicted <- predict(object@parameters, X_predict)
@@ -41,11 +43,14 @@ fido <- function(
     ts, 
     sigma, 
     rho, 
-    design = "~ time + P1 + V1") {
+    #design = "~ time + P1 + V1") {
+    design = "~ -1 + time + P1 + V1 + subject") {
   dat <- fido_data(ts)
   Y <- dat$Y
   D <- nrow(Y) # taxa
   N <- ncol(Y)
+  dat$samples <- dat$samples |>
+    mutate(subject = as.integer(as.factor(subject)))
   X <- t(model.matrix(formula(design), data=dat$samples))
   
   Gamma <- function(X){
@@ -80,11 +85,11 @@ setMethod("predict",  c(object = "fido_model"), fido_predict)
 #' @export
 Gamma_ <- function(X, sigma, rho) {
   ## here we are assuming RBF kernel over time
-  Gamma <- SE(X[1, ,drop = FALSE], sigma = sigma, rho = rho)
+  Gamma <- SE(X["time", ,drop = FALSE], sigma = sigma, rho = rho)
   ## next we add in the conditional independence assumption between subjects
   ## following code should zero out any entry where z_i != z_j,
   ## please check
-  mask <- as.matrix(dist(factor(X[2, , drop = FALSE])))
+  mask <- as.matrix(dist(factor(X["subject", , drop = FALSE])))
   Gamma[mask >= 1] <- 0
   return(Gamma)
 }

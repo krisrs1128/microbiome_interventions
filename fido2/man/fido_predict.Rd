@@ -4,7 +4,7 @@
 \alias{fido_predict}
 \title{Obtain predictions from a fitted multinomial logit (ALR, CLR) Gaussian process model object and return a ts_inter object.}
 \usage{
-fido_predict(object, newdata, design = "~ time + P1")
+fido_predict(object, newdata, design = "~ time + P1 + V1 + subject")
 }
 \arguments{
 \item{object}{a fitted object of class inheriting from "fido::basset".}
