@@ -79,7 +79,6 @@ samples <- read_csv("https://figshare.com/ndownloader/files/40322776/samples.csv
 subject_data <- read_csv("https://figshare.com/ndownloader/files/40322773/subject.csv")
 interventions <- read_csv("https://figshare.com/ndownloader/files/40322770/interventions.csv") |>
   column_to_rownames("sample")
-
 ```
 
 Note that, unlike most microbiome studies, these data has relatively few taxa
@@ -163,7 +162,13 @@ ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[26:49
 ```
 
 We compare the true vs. predicted abundances in the block below. Samples with
-more accurate predictions lie nearer to the diagonal.
+more accurate predictions lie nearer to the diagonal. We've split the taxa by
+abundance -- row labels give quantiles of average abundance. Note that each row
+has a different $y$ axis. The clearest patterns are that,
+
+* Short time horizons are easier to predict than long ones.
+* In all panels, in and out-of-sample performance seem comparable,  so we don't have to be too worried about overfitting.
+* More abundant taxa appear slightly easier to predict. This partly reflects the high noise level of the underlying data. For rarer taxa, however, many errors come from the model's inability to predict exact zeros. This could potentially be improved by altering the model form.
 
 ```{r, fig.width = 10, fig.height = 6}
 map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
@@ -172,8 +177,8 @@ map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
     ggplot() +
     geom_abline(slope = 1, col = "#400610") +
     geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
-    facet_grid(factor(quantile, rev(levels(quantile))) ~ glue("lag {h}"), scales = "free_y") +
-    labs(x = expression(y), y = expression(hat(y)), col = "Steps Ahead") +
+    facet_grid(factor(quantile, rev(levels(quantile))) ~ glue("lags {h + 1} - {h + 10}"), scales = "free_y") +
+    labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
     scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
     scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
     scale_color_manual(values = c("#A65883", "#6593A6")) +
@@ -188,12 +193,50 @@ map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
     )
 ```
 
-### Selecting Taxa with Strong Effects
+### Attribution Analysis:  Selecting Important Taxa
+
+Given the reasonable performance of the model, it makes sense to try
+following-up with some more formal statistical inference. Specifically, we want
+to know which taxa are most affected by the intervention, but we some formal
+statistical guarantees that we aren't reading too much into anything that is
+just noise. To this end, we have included a `select_taxa` function that performs
+selective inference through data splitting, following `r Citep("Dai2020FalseDR")`. Roughly, we estimate marginal effects of 
+different hypothetical interventions on each taxa. We do this over. many random
+splits of the data, and if a similar marginal effects is detected across the.
+splits, then we intuitively suspect that the intervention does influence that
+taxa. The algorithm in `r Citep("Dai2020FalseDR")` formalizes this intuition in
+a way that ensures that the false discovery rate is controlled. See the
+manuscript accompanying the package for details.
+
+Practically, to implement this selection algorithm, we need to provide the
+counterfactual interventions that we want to contrast. This is done in the step
+below. The `steps` helper function creates a few example counterfactuals.
 
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2:4, L = 4)
+ws
+```
+
+We'll contrast the taxa trajectories when the first two timepoints are and are
+not assumed to belong to the `birth` intervention. By default, we control the
+FDR at a $q$-level of 0.2 -- this can be modified using the `qvalue` argument.
+We have to fit our model over 20 random splits of the data, so this step takes
+some time. More splits yields higher power, but small values `n_splits` will
+still guarantee FDR control, and you will still be able to run the rest of the
+vignette even if you set `n_splits` to a value like 3 or 4.
+
+```{r}
 staxa <- select_taxa(ts, ws[[1]], ws[[2]], ~ mbtransfer(., 3, 3), n_splits = 20)
 ```
+
+The `ms` element of this object includes the raw mirror statistics that led to
+the final inference. The larger the value of these mirror statistics, the
+stronger the estimated intervention effect. Mirror statistics that are symmetric
+around zero suggest that there is no intervention effect. Visualizing these
+results, it seems that most taxa in the data are affected by the intervention.
+This contrasts with the other vignettes in this package, where effect seems more
+taxa-specific. The result is consistent with the findings of `r Citep("Costello2022LongitudinalDO")`, though. Delivery dramatically remodels the
+vaginal microbiome.
 
 ```{r, fig.height = 5, fig.width = 10}
 staxa$ms |>
@@ -214,6 +257,17 @@ staxa$ms |>
 
 ### Comparing Counterfactual Trajectories
 
+Mirror statistics can highlight the species that are the most influenced by the
+intervention, but they do not help us describe the "shape" of an intervention
+effect. Are there taxa that are immediately impacted, but which recover quickly?
+Are there others whose effects are delayed? Transfer function models can help to
+answer this question. The idea is to simulate identical interventions across all
+subjects using the fitted model to predict the subsequent taxonomic abundance
+trajectories. Do be cautious with interpretation, though. Simpler models
+(smaller $P$ and $Q$) have limited expressivity -- there are only so many shapes
+they can approximate. That said, the simulated trajectories often provide a
+useful summary of intervention effects across heterogeneous populations.
+
 ```{r}
 ws <- steps(c("birth" = TRUE), lengths = 2, L = 10)
 start_ix <- map_dbl(ts, ~ min(which(.@time >= -14))) - 1
@@ -227,6 +281,8 @@ for (i in 0:1) {
     map(~ predict(fits[["in-sample"]], .))
 }
 ```
+
+We'll pull out
 
 ```{r fig.width=9, fig.height=4.5}
 focus_taxa <- c("Porphyromonas", "Lactobacillus", "Prevotella_6", "L.jensenii", "L.iners", "Atopobium")
