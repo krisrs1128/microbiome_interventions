@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 72
+  run_id: 1
 ---
 
 ```{r setup, include=FALSE}
@@ -14,13 +14,13 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r libraries}
-library(glue)
-library(fs)
-library(tidyverse)
-library(tfPaper)
-library(mdsine)
-library(mbtransfer)
 library(fido2)
+library(fs)
+library(glue)
+library(mbtransfer)
+library(mdsine)
+library(tfPaper)
+library(tidyverse)
 set.seed(20230412)
 ```
 
@@ -43,7 +43,9 @@ attach(as.list(configurations[params$run_id, ]))
 if (method == "mbtransfer") {
   predict <- mbtransfer::predict
 } else if (method == "mdsine") {
-  predit <- mdsine::predict
+  predict <- mdsine::predict
+} else if (method == "fido") {
+  predict <- fido2::predict
 }
 ```
 
