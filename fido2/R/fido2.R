@@ -7,7 +7,7 @@
 #' @export
 fido_predict <- function(object, 
                          newdata, 
-                         design = "~ time + P1 + V1 + subject") {
+                         design = "~ -1 + time + P1 + V1 + subject") {
   data <- fido_data(newdata)
   data$samples <- data$samples |>
     mutate(subject = as.integer(as.factor(subject)))
