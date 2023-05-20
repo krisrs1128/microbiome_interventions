@@ -19,7 +19,8 @@ approx_mat <- function(time, y_mat, times_out, method) {
       time, 
       y_mat[i, ], 
       times_out,
-      method = method
+      method = method,
+      ties = mean
     )$y
   }
   
@@ -30,7 +31,7 @@ approx_mat <- function(time, y_mat, times_out, method) {
 interpolate_ <- function(ts_inter_single, delta, method) {
   time <- ts_inter_single@time
   times_out <- seq(min(time), max(time), by = delta)
-  ts_inter_single@time <- seq(min(time), max(time), delta)
+  ts_inter_single@time <- times_out
 
   v <- values(ts_inter_single)
   inter <- interventions(ts_inter_single)
