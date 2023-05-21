@@ -18,7 +18,16 @@ knitr::opts_chunk$set(
 library(mbtransfer)
 library(tidyverse)
 library(glue)
-theme_set(theme_bw())
+th <- theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "#f7f7f7"),
+    panel.border = element_rect(fill = NA, color = "#0c0c0c", size = 0.6),
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+theme_set(th)
 ```
 
 ```{r}
@@ -129,7 +138,7 @@ for (i in seq_along(ws)) {
 ```{r}
 pal <- c("#cbd8e8", "#becbdc", "#b1bed0", "#a4b2c4", "#97a5b8", "#8b99ac", "#808da0", "#748193", "#697587", "#5e697b")
 
-sim_ts <- map(sim_ts_, ~ mbtransfer_predict(fit, .)) |>
+sim_ts <- map(sim_ts_, ~ predict(fit, .)) |>
   map_dfr(sim_ts, pivot_ts, .id = "counterfactual")
 
 sim_ts |>
