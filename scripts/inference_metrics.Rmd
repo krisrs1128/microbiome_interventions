@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 1
+  run_id: 129
   qvalue: 0.2
 ---
 
@@ -83,21 +83,13 @@ R_deseq <- replicate(max(lags), R_deseq, simplify = FALSE)
 ### Mirror-based testing
 
 ```{r multisplit_mirrors}
-ws <- steps(c("P1" = TRUE), L = max(lags))
 tr_fun <- function(x) {
   mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q)
 }
 
-effects <- pd_splits(ts, ws[[1]], ws[[2]], tr_fun, 20)
-ms <- consistency_mirror_multisplit(effects)
-```
-
-```{r false_discovery_estimates}
-R_mirror <- ms |>
-  select(multisplit, m, lag) %>%
-  split(.$lag) %>%
-  map(~ split(., .$multisplit) %>% map(~ pull(., m))) |>
-  map(~ which(multiple_data_splitting(., q = params$qvalue)))
+ws <- steps(c("P1" = TRUE), L = max(lags))
+staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 50)
+R_mirror <- map(staxa$taxa, ~ as.integer(str_remove(., "tax")))
 ```
 
 ### Combining results
@@ -110,7 +102,7 @@ testing_results <- bind_rows(testing_results, .id = "method")
 ```
 
 ```{r save_results}
-save(testing_results, ms, file = output_path)
+save(testing_results, file = output_path)
 ```
 
 ```{r session}

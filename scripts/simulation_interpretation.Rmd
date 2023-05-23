@@ -30,10 +30,6 @@ configurations <- method_configurations(data_var$data_path) |>
 ```
 
 ```{r}
-configurations[c(5,6, 11, 12), ]
-```
-
-```{r}
 paths <- dir_ls(params$outputs_dir, recurse = TRUE) |>
   path_filter(regexp=params$outputs_filter)
 
@@ -117,7 +113,7 @@ testing_results <- paths |>
   left_join(inference_config)
 ```
 
-```{r}
+```{r, fig.height = 7, fig.width = 10}
 pal <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
 testing_results |>
   filter(type == "marginal") |>
@@ -129,7 +125,7 @@ testing_results |>
   geom_vline(xintercept = 0.2, col = "#898989", size = 1) +
   geom_point(aes(fdp, power, shape = signal_B, col = lag), size = 3) +
   scale_color_manual(values = pal) +
-  facet_grid(normalization ~ method + prop_nonnull) +
+  facet_grid(n_taxa + normalization ~ method + prop_nonnull) +
   labs(x = "False Discovery Proportion", y = "Power", col = "Lag") +
   theme(
     axis.text = element_text(size = 10),
@@ -138,12 +134,24 @@ testing_results |>
     panel.spacing = unit(0.1, "line")
   )
 
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/inference-sim-error.png", height = 5, width = 10)
+ggsave("inference-sim-error.png", height = 5, width = 10)
 
 summary_table <- testing_results |>
   filter(type == "marginal") |>
-  group_by(method, normalization, lag, prop_nonnull, signal_B) |>
-  summarise(FDP = round(mean(fdp), 3))
+  group_by(method, normalization, lag, n_taxa, prop_nonnull, signal_B) |>
+  summarise(
+    FDP = round(mean(fdp), 3),
+    FDP_sd = round(sd(fdp), 3)
+  )
 
-#write_csv(summary_table, "~/Desktop/laboratory/talks/2023/20230414/figures/summary_table_fdp.csv")
+write_csv(summary_table, "summary_table_fdp.csv")
 ```
+```{r}
+summary_table
+```
+```{r}
+testing_results |>
+  filter(type == "marginal", str_detect(full_path, "inference-129.rda")) |>
+  select(method, normalization, lag, fdp)
+```
+

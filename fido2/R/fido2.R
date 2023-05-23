@@ -43,7 +43,6 @@ fido <- function(
     ts, 
     sigma, 
     rho, 
-    #design = "~ time + P1 + V1") {
     design = "~ -1 + time + P1 + V1 + subject") {
   dat <- fido_data(ts)
   Y <- dat$Y
