@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 4
+  run_id: 673
 ---
 
 ```{r setup, include=FALSE}
@@ -24,6 +24,10 @@ library(tidyverse)
 set.seed(20230412)
 ```
 
+We first generate data and methods configuration for the current simulation run.
+The approach is to generate all possible configurations and then subset to the
+current run of interest.
+
 ```{r configurations}
 configurations <- dir_ls(params$data_dir) |>
   path_abs() |>
@@ -36,7 +40,9 @@ data_config <- data_parameters() |>
 
 configurations <- configurations |>
   left_join(data_config) |>
-  filter(!(method == "mdsine" & n_taxa > 100))
+  filter(!(method == "mdsine" & n_taxa > 400))
+
+which(configurations$method == "mdsine" & configurations$n_taxa == 200)
 
 attach(as.list(configurations[params$run_id, ]))
 
@@ -49,10 +55,9 @@ if (method == "mbtransfer") {
 }
 ```
 
-This script doesn't presume to know which input datasets are to be considered.
-It just runs on whatever data are available and computes metrics if possible.
-The main parameters are related to cross validation, the method to use, the data
-to use, and any ground truth needed in order to compute metrics.
+Next, we generate the `ts` object associated with the current simulation data.
+The data are expected to be stored in the `data_path` and to have been generated
+using the `simulation_data.Rmd` script.
 
 ```{r ts-object}
 load(as.character(data_path))
@@ -71,7 +76,11 @@ ts <- reads |>
   interpolate()
 ```
 
-First, the forecasting metrics.
+We compute forecasting errors using cross validation. Our implementation uses
+functional programming. It expects, as input, a training funciton that outputs
+an object with a `predict` method. This is used to make predictions on the
+holdout fold. We also compute the time it took for cross-validation and report
+the per-fold average training time.
 
 ```{r cross_validation}
 tr_fun <- function(method, hyper = list()) {
@@ -86,27 +95,13 @@ tr_fun <- function(method, hyper = list()) {
   }
 }
 
+start <- Sys.time()
 result <- cross_validate(ts, tr_fun(method, hyper), K = 4)
+time_diff <- (Sys.time() - start) / 4
 metrics <- result$metrics
 ```
 
-```{r}
-ggplot(metrics) +
-  geom_boxplot(aes(lag, mae))
-```
-
-We can evaluate the overall training time.
-
-```{r compute_time}
-start <- Sys.time()
-fit <- tr_fun(method, hyper)(ts)
-time_diff <- Sys.time() - start
-```
-
 ```{r save_results}
-save(metrics, time_diff, fit, file = output_path)
-```
-
-```{r session}
+save(metrics, time_diff, file = output_path)
 sessionInfo()
 ```
