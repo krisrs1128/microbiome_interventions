@@ -14,13 +14,13 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ```{r}
-library(glue)
+library(fido2)
 library(fs)
-library(tidyverse)
-library(tfPaper)
+library(glue)
 library(mbtransfer)
 library(mdsine)
-library(fido2)
+library(tfPaper)
+library(tidyverse)
 theme_set(my_theme())
 ```
 
@@ -61,9 +61,10 @@ configurations <- configurations |>
 
 ```{r}
 cvs <- list()
+predict <- mdsine::predict
 #cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, taxonomy), K = 4, seeds = 1:4)
 predict <- mbtransfer::predict
-cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 3, 3), K = 4, seeds = 1:4)
+cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 4, 4), K = 4, seeds = 1:4)
 predict <- fido2::predict
 cvs[["fido"]] <- cross_validate(ts, \(x) fido(x, sigma = 1, rho = 1), K = 4, seeds = 1:4)
 #saveRDS(cvs, "../data/compare-trajectories.rds")
@@ -95,6 +96,19 @@ for (i in seq_along(cvs[["mdsine"]]$y_hat)) {
     subject  = names(cvs[["mdsine"]]$y_hat[[i]])
   )
 }
+
+cvs[["fido"]]$y_hat <- map(cvs[["fido"]]$y_hat, ~ {
+  subject_ids <- list()
+  for (i in seq_along(.)) {
+    subject_ids[[i]] <- colnames(values(.[[i]]))
+  }
+  subject_ids <- str_extract(c(unlist(subject_ids)), "[0-9]+") |>
+    unique()
+  
+  names(.) <- glue("S{subject_ids}")
+  subject_data(.)$subject <- glue("S{subject_ids}")
+  .
+})
 
 y_hats <- list(
   "mdsine" = map_dfr(cvs[["mdsine"]]$y_hat, ~ pivot_ts(.), .id = "fold"),
