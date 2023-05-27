@@ -170,9 +170,9 @@ ggplot(values_df, aes(time, reorder(subject, value))) +
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(54)){
+for (i in seq_len(27)){
   if (i %% 5 == 0) {
-    print(glue::glue("{i}/54"))
+    print(glue::glue("{i}/27"))
   }
   rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
 }

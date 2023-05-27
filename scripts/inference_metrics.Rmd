@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 129
+  run_id: 3
   qvalue: 0.2
 ---
 
@@ -88,7 +88,7 @@ tr_fun <- function(x) {
 }
 
 ws <- steps(c("P1" = TRUE), L = max(lags))
-staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 50)
+staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 25, qvalue = params$qvalue)
 R_mirror <- map(staxa$taxa, ~ as.integer(str_remove(., "tax")))
 ```
 

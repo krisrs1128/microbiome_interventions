@@ -31,7 +31,7 @@ samples <- read_csv(file.path(data_dir,"sample_metadata.csv"), col_names = c("sa
   mutate(intervention = str_extract(subject, "[A-z]+"))
 subject <- read_csv(file.path(data_dir, "subject_data.csv"))
 
-keep_ix <- colMeans(reads != 0) > 0.4
+keep_ix <- colMeans(reads != 0) > 0.2
 reads <- reads[, as.logical(keep_ix)]
 ```
 

@@ -6,7 +6,7 @@ output:
 date: "`r Sys.Date()`"
 params:
   data_dir: "tf_sim/"
-  run_id: 673
+  run_id: 4
 ---
 
 ```{r setup, include=FALSE}
@@ -40,9 +40,8 @@ data_config <- data_parameters() |>
 
 configurations <- configurations |>
   left_join(data_config) |>
-  filter(!(method == "mdsine" & n_taxa > 400))
+  filter(!(method == "mdsine" & n_taxa > 200))
 
-which(configurations$method == "mdsine" & configurations$n_taxa == 200)
 
 attach(as.list(configurations[params$run_id, ]))
 
