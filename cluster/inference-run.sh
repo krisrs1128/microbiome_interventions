@@ -11,6 +11,8 @@ Rscript -e "purrr::map(c('mbtransfer', 'tfPaper'), devtools::install)"
 cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .
 tar -zxvf tf_sim.tar.gz
 
+process=$((process + 54))
+
 # run the model configuration
 for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); do
   export RUN=$(printf %03d $i)
