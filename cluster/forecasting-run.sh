@@ -1,4 +1,5 @@
 
+#!/bin/bash
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
 
 # install packages
