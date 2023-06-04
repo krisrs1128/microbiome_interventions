@@ -42,7 +42,6 @@ configurations <- configurations |>
   left_join(data_config) |>
   filter(!(method == "mdsine" & n_taxa > 200))
 
-
 attach(as.list(configurations[params$run_id, ]))
 
 if (method == "mbtransfer") {

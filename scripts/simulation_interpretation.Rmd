@@ -58,17 +58,20 @@ computation |>
   mutate(
     time_diff = as.numeric(time_diff) / 60,
     P = ifelse(is.na(P), "", as.character(P)),
+    rho = ifelse(is.na(rho), "", as.character(rho)),
+    hyperparameter = glue("{rho}{P}"),
+    method = case_match(method, "mdsine" ~ "MDSINE2", "fido" ~ "fido", "mbtransfer" ~ "mbtransfer")
   ) |>
   ggplot() +
   geom_boxplot(
-    aes(normalization, time_diff, col = interaction(method, P), fill = interaction(method, P)), 
+    aes(reorder(normalization, time_diff), time_diff, col = interaction(method, hyperparameter), fill = interaction(method, hyperparameter)), 
     alpha = 0.6,
     position = position_dodge2(preserve = "single")
   ) +
   scale_fill_brewer(palette = "Set1") +
   scale_color_brewer(palette = "Set1") +
   scale_y_log10() +
-  labs(y = "Minutes", col = "Method", fill = "Method") +
+  labs(y = "Minutes", col = "Method", fill = "Method", x = "Normalization") +
   facet_wrap(~ method) +
   theme(
     strip.text = element_text(size = 16),
@@ -77,7 +80,7 @@ computation |>
 ggsave("computation-sim.png", width = 11, height = 4)
 ```
 
-```{r, fig.width = 12, fig.height = 6}
+```{r, fig.width = 14, fig.height = 8}
 metrics <- metrics |>
   left_join(metadata) |>
   unnest_wider("hyper")
@@ -85,44 +88,50 @@ metrics <- metrics |>
 for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
   cur_metrics <- metrics |>
     mutate(
-      n_taxa = factor(glue("{n_taxa} taxa"), levels = c("50 taxa", "100 taxa", "200 taxa")),
+      n_taxa = factor(glue("{n_taxa} taxa"), levels = c("100 taxa", "200 taxa", "400 taxa")),
       prop_nonnull = glue("{100 * prop_nonnull}% nonnull"),
+      lag = glue("Lag {lag}"),
       P = ifelse(is.na(P), "", as.character(P)),
+      rho = ifelse(is.na(rho), "", as.character(rho)),
+      hyperparameter = glue("{rho}{P}"),
+      method = case_match(method, "mdsine" ~ "MDSINE2", "fido" ~ "fido", "mbtransfer" ~ "mbtransfer"),
       signal_B = glue("b = {signal_B}")
     ) |>
     filter(normalization == norm_n)
   
   metrics_range <- cur_metrics |>
-    filter(method != "mdsine") |>
+    filter(method != "MDSINE2") |>
     summarise(
-      min = 0.5 * quantile(mae, 0.25, na.rm = T),
-      max = 1.5 * quantile(mae, 0.75, na.rm = T)
+      min = median(mae, na.rm = T) - 3 * IQR(mae, na.rm = T),
+      max = max(0, median(mae, na.rm = T) + 3 * IQR(mae, na.rm = T))
     )
 
   ggplot(cur_metrics) +
     geom_boxplot(
-      aes(n_taxa, mae, fill = interaction(factor(method), P), col = interaction(factor(method), P)), 
+      aes(signal_B, mae, fill = interaction(factor(method), hyperparameter, sep = ""), col = interaction(factor(method), hyperparameter, sep = "")), 
       alpha = 0.5,
       position = position_dodge2(preserve = "single")
       ) +
     scale_fill_brewer(palette = "Set1") +
     scale_color_brewer(palette = "Set1") +
-    facet_wrap(prop_nonnull ~ signal_B) +
+    facet_wrap(n_taxa ~ prop_nonnull, ncol = 3) +
     scale_y_continuous(limits = c(metrics_range$min, metrics_range$max)) +
     labs(
       x = "Number of Taxa", 
-      y = "Mean Absolute Error (H = 1,..,5)", 
+      y = "Mean Absolute Error (Lags H = 1, ..., 5)",
       col = "Method", 
       fill = "Method",
       title = glue("Normalization - {norm_n}")
     ) +
     theme(
       strip.text = element_text(size = 14),
+      axis.text.x = element_text(angle = 90, size = 15),
+      axis.text.y = element_text(angle = 0, size = 10),
       legend.title = element_text(size = 16),
       legend.text = element_text(size = 14),
       title = element_text(size = 18)
     )
-  ggsave(glue("forecasting-sim-{norm_n}.png"), height = 6, width = 12)
+  ggsave(glue("forecasting-sim-{norm_n}.png"), height = 8, width = 14)
 }
 
 ```
@@ -156,8 +165,8 @@ testing_results |>
   scale_color_manual(values = pal) +
   scale_y_continuous(breaks = c(.5, 1)) +
   scale_x_continuous(breaks = c(0.2, 0.4, 0.6, 0.8)) +
-  facet_grid(n_taxa + normalization ~ prop_nonnull + method) +
-  labs(x = "False Discovery Proportion", y = "Power", col = "Lag") +
+  facet_grid(normalization + n_taxa ~ prop_nonnull + method) +
+  labs(x = "False Discovery Proportion", y = "Power", col = "Lag", shape = "Signal Strength") +
   theme(
     axis.text = element_text(size = 10),
     strip.text = element_text(size = 14),

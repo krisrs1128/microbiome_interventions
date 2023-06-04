@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  run_id: 7
+  run_id: 8
 ---
 
 ```{r setup, include=FALSE}
@@ -141,10 +141,10 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 ```
 
 ```{r}
-save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+#save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
-```{r, eval = FALSE}
+```{r, eval = FALSE, fig.width = 8, fig.height = 4}
 values_df <- data.frame(reads) |>
   rownames_to_column("sample") |>
   pivot_longer(-sample, names_to = "taxon") |>
@@ -155,11 +155,12 @@ values_df <- data.frame(reads) |>
   left_join(rownames_to_column(data.frame(interventions), "sample"))
   
 ggplot(values_df, aes(time, reorder(subject, value))) +
-  geom_tile(aes(fill = value, col = as.factor(P1)), size = .3) +
-  scale_fill_distiller(direction = 1) +
+  geom_tile(aes(fill = value, col = as.factor(P1), size = P1)) +
   facet_wrap(~ taxon) +
-  labs(x = "Time", y = "Subject") +
-  scale_color_manual(values = c("#F2E8DF", "#BF0426")) +
+  labs(x = "Time", y = "Subject", fill = "Quantile") +
+  scale_fill_gradient(low = "#eaf7f7", high = "#037F8C") +
+  scale_color_manual(values = c("#F2E8DF", "#BF3945"), guide = FALSE) +
+  scale_size(range = c(0, .25), guide = FALSE) +
   scale_x_continuous(expand = c(0, 0)) +
   theme(
     axis.ticks.y = element_blank(),
@@ -167,6 +168,7 @@ ggplot(values_df, aes(time, reorder(subject, value))) +
   )
 
 #ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/simulation-hm.png", width = 10, height = 6)
+ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
 ```
 
 ```{r, eval = FALSE}
