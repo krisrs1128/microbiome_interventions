@@ -106,7 +106,7 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
       max = max(0, median(mae, na.rm = T) + 3 * IQR(mae, na.rm = T))
     )
 
-  ggplot(cur_metrics) +
+  p <- ggplot(cur_metrics) +
     geom_boxplot(
       aes(signal_B, mae, fill = interaction(factor(method), hyperparameter, sep = ""), col = interaction(factor(method), hyperparameter, sep = "")), 
       alpha = 0.5,
@@ -115,7 +115,6 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
     scale_fill_brewer(palette = "Set1") +
     scale_color_brewer(palette = "Set1") +
     facet_wrap(n_taxa ~ prop_nonnull, ncol = 3) +
-    scale_y_continuous(limits = c(metrics_range$min, metrics_range$max)) +
     labs(
       x = "Number of Taxa", 
       y = "Mean Absolute Error (Lags H = 1, ..., 5)",
@@ -131,9 +130,12 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
       legend.text = element_text(size = 14),
       title = element_text(size = 18)
     )
+  
+  ggsave(glue("forecasting-sim-no-truncation{norm_n}.png"), height = 8, width = 14)
+  
+  p <- p + scale_y_continuous(limits = c(metrics_range$min, metrics_range$max))
   ggsave(glue("forecasting-sim-{norm_n}.png"), height = 8, width = 14)
 }
-
 ```
 
 ### Inferential Results

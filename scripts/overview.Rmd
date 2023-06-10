@@ -38,7 +38,7 @@ ts_df <- map2(ts_df, interventions, ~ left_join(.x, .y))
 ```{r}
 library(glue)
 
-composition_plot <- function(ts_df, width = 1, ymax = 1, n_taxa = 10, ylab = "Intervention") {
+composition_plot <- function(ts_df, width = 1, ymax = 1, n_taxa = 10, ylab = "Intervention", title = "") {
   if (n_taxa == 10) {
     pal <- c("#F2668B", "#4C3959", "#2198A6", "#17BFBF", "#F2C777", "#A577A6", "#BF3C1F", "#75A644", "#D99C52", "#69BF97")
   }
@@ -65,9 +65,10 @@ composition_plot <- function(ts_df, width = 1, ymax = 1, n_taxa = 10, ylab = "In
       legend.position = "bottom",
       axis.text.x = element_blank(),
       axis.title.x = element_blank(),
-      strip.text = element_text(size = 16)
+      strip.text = element_text(size = 16),
+      title = element_text(size = 20)
     ) +
-    labs(y = "Composition", fill = "", col = "") +
+    labs(y = "Composition", fill = "", col = "", title = title) +
     scale_fill_manual(values = pal) +
     scale_color_manual(values = pal)
   
@@ -91,17 +92,17 @@ composition_plot <- function(ts_df, width = 1, ymax = 1, n_taxa = 10, ylab = "In
 p1 <- ts_df[[1]] |>
   filter(subject %in% glue("Animal2")) |>
   rename("intervention" = "Animal") |>
-  composition_plot(ymax = 0.42, ylab = "Animal Diet")
+  composition_plot(ymax = 0.42, ylab = "Animal Diet", title = "(a)")
 
 p2 <- ts_df[[2]] |>
   filter(subject %in% c("S10004")) |>
   rename("intervention" = "birth") |>
-  composition_plot(width = 14, ymax = 0.55, ylab = "Birth Period")
+  composition_plot(width = 14, ymax = 0.55, ylab = "Birth Period", title = "(b)")
 
 p3 <- ts_df[[3]] |>
   filter(subject %in% c("T1")) |>
   rename("intervention" = "pH") |>
-  composition_plot(width = 1, ymax = 0.26, ylab = "pH")
+  composition_plot(width = 1, ymax = 0.26, ylab = "pH", title = "(c)")
 ```
 
 
