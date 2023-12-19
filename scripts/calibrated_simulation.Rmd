@@ -1,0 +1,100 @@
+---
+title: "Calibrated Simulation"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(MIDASim)
+library(mbtransfer)
+```
+
+General parameters
+
+```{r}
+n_taxa <- 191
+nonnull_prop <- 0.2
+b <- 2
+J0 <- floor(nonnull_prop * n_taxa)
+```
+
+Read in data and format as an interventions object.
+
+```{r}
+subject <- read_csv("https://figshare.com/ndownloader/files/40275934/subject.csv")
+interventions <- read_csv("https://figshare.com/ndownloader/files/40279171/interventions.csv") |>
+ column_to_rownames("sample")
+reads <- read_csv("https://figshare.com/ndownloader/files/40279108/reads.csv") |>
+ column_to_rownames("sample")
+samples <- read_csv("https://figshare.com/ndownloader/files/40275943/samples.csv")
+
+ts <- as.matrix(reads) |>
+  ts_from_dfs(interventions, samples, subject) |>
+  interpolate(method = "linear")
+
+ts
+```
+
+Simple example using MIDAS, no temporal effects.
+
+```{r}
+reads_aligned <- map(ts@series, ~ t(.@values))
+reads_aligned_mat <- do.call(rbind, reads_aligned)
+sim <- MIDASim.setup(reads_aligned_mat)
+sim2 <- MIDASim.modify(sim)
+sim2 <- MIDASim(sim2)
+X <- sim2$sim_count
+hist(reads_aligned_mat[, "Otu000080"])
+hist(X[, "Otu000080"])
+```
+
+Let's fit a series of MIDAS models smoothed over temporal windows.
+
+```{r}
+time_window <- function(series, t = 0, window_size = 5) {
+  times <- map(series, ~ .@time)
+  template_data <- list()
+  for (i in seq_along(series)) {
+    cur_times <- which(abs(times[[i]] - t) < window_size)
+    series[[i]]@time <- cur_times
+    template_data[[i]] <- t(series[[i]]@values[, cur_times])
+  }
+  
+  do.call(rbind, template_data)
+}
+
+temporal_midas <- function(series, t_min = 0, t_max = 8, window_size = 5) {
+  fits <- list()
+  ts <- seq(t_min, t_max)
+  for (i in seq_along(ts)) {
+    template_data <- time_window(series, ts[i], window_size)
+    fits[[i]] <- MIDASim.setup(template_data, mode = "parametric")
+  }
+  
+  fits
+}
+
+# second half of timepoints are modified. Two samples per timepoint
+fits <- temporal_midas(ts@series)
+fits_modified <- map(fits, MIDASim.modify, lib.size = rep(1e5, 10))
+fits_modified[5:9] <- fits_modified[5:9] |>
+  map(~ {
+    new_mu <- .$mu.est
+    new_mu[seq_len(J0 / 2)] <- new_mu[seq_len(J0 / 2)] + b
+    new_mu[seq(J0/2 , J0)] <-  new_mu[seq(J0/2 , J0)] - b
+    MIDASim.modify(., gengamma.mu = new_mu, lib.size = rep(1e5, 10))
+  })
+```
+
+```{r}
+simulated <- map(fits_modified, MIDASim)
+counts <- map_dfr(simulated, ~ data.frame(.$sim_count), .id = "time")
+ggplot(counts) +
+  geom_boxplot(aes(factor(time), Otu000117)) +
+  scale_y_log10()
+```
