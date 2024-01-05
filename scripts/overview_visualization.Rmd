@@ -1,0 +1,75 @@
+---
+title: "overview_visualization"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tfPaper)
+library(tidyverse)
+library(patchwork)
+```
+
+
+```{r}
+load("~/Downloads/sim_input_016.rda")
+interventions
+dim(reads)
+
+bind_cols(metadata, interventions, reads) |>
+  filter(subject == "S1") |>
+  ggplot() +
+  geom_point(aes(time, tax10, col = P1))
+```
+
+```{r}
+library(mbtransfer)
+ts <- as.matrix(reads)[, 1:20] |>
+  normalize(method = "DESeq2-asinh") |>
+  ts_from_dfs(interventions, metadata, subject_data)
+fit <- mbtransfer(ts, P = 3, Q = 3)
+```
+
+```{r}
+ws <- steps(c("P1" = TRUE), 2, 4, 10)
+ts_star <- counterfactual_ts(ts, ws[[1]], ws[[2]], start_ix = 10)
+y0 <- predict(fit, ts_star$ts0[1])
+y1 <- predict(fit, ts_star$ts1[1])
+y0_ <- values(y0[[1]])
+y1_ <- values(y1[[1]])
+
+names_ix <- names(sort(rowMeans(abs(y0_ - y1_)) / apply(y0_, 1, max), decreasing = TRUE))
+```
+
+```{r}
+for (i in 1:10) {
+  plot(y1_[names_ix[i], ])
+  points(y0_[names_ix[i], ], col = "red")
+}
+#plot(y1_["tax10", ])
+#points(y0_["tax10", ], col = "red")
+```
+```{r}
+y_merged <- bind_rows(
+  data.frame(y0_) |>
+    rownames_to_column("taxon"),
+  data.frame(y1_) |>
+    rownames_to_column("taxon"),
+  .id = "counterfactual"
+) |>
+  pivot_longer(-taxon:-counterfactual, names_to = "sample") |>
+  group_by(counterfactual, taxon) |>
+  mutate(time = row_number())
+
+y_merged |>
+  filter(taxon %in% names_ix[1:10], time > 9) |>
+  ggplot() +
+    geom_line(aes(time, value, col = counterfactual)) +
+    facet_wrap(~ reorder(taxon, value), ncol = 5) +
+    theme_void()
+```
+
