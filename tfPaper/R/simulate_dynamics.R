@@ -1,16 +1,29 @@
 
 #' @export
-step_t <- function(f, g, h) {
+step_t <- function(f, g, h, noise_gen) {
   fun <- function(x, w, z) {
-    f$fun(x) + g$fun(w) + h$fun(z, w)
+    f$fun(x) + g$fun(w) + h$fun(z, w) + noise_gen()
   }
   params <- list(P = f$lag, Q = g$lag, PQ = h$lag)
   list(fun = fun, params = params)
 }
 
+#' @importFrom igraph distances make_tree
+tree_covariance <- function(n_taxa, alpha) {
+  D <- distances(make_tree(n_taxa, 2))
+  1 / (D ^ alpha + 1)
+}
+
 #' @export
-matnorm <- function(N, M, mu = 0, sigma = 1) {
-  matrix(rnorm(N * M, mu, sigma), N, M)
+matnorm <- function(N, M, mu = 0, Sigma = NULL) {
+  if (length(mu) == 0) {
+    mu <- rep(mu, M)
+  }
+  if (is.null(sigma)) {
+    Sigma <- diag(1, nrow = M)
+  }
+
+  MASS::mvnrorm(N, mu, Sigma)
 }
 
 #' @export
@@ -24,7 +37,6 @@ matunifband <- function(N, M, lower = .5, upper = 1) {
   z <- matrix(sample(c(1, -1), N * M, replace = TRUE), N, M)
   x * z
 }
-
 
 #' @importFrom MCMCpack rdirichlet
 factorized_step <- function(J, K, D = NULL, ...) {
