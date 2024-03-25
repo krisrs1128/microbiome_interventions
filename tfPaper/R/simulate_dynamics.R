@@ -9,21 +9,21 @@ step_t <- function(f, g, h, noise_gen) {
 }
 
 #' @importFrom igraph distances make_tree
-tree_covariance <- function(n_taxa, alpha) {
+#' @export
+tree_covariance <- function(n_taxa, alpha, beta = 1, gamma = 1) {
   D <- distances(make_tree(n_taxa, 2))
-  1 / (D ^ alpha + 1)
+  beta / (D + gamma) ^ alpha
 }
 
 #' @export
 matnorm <- function(N, M, mu = 0, Sigma = NULL) {
-  if (length(mu) == 0) {
+  if (length(mu) == 1) {
     mu <- rep(mu, M)
   }
-  if (is.null(sigma)) {
+  if (is.null(Sigma)) {
     Sigma <- diag(1, nrow = M)
   }
-
-  MASS::mvnrorm(N, mu, Sigma)
+  MASS::mvrnorm(N, mu, Sigma)
 }
 
 #' @export
