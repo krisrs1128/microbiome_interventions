@@ -21,6 +21,10 @@ set.seed(params$replicate)
 ```
 
 ```{r}
+data_parameters()
+```
+
+```{r}
 attach(fixed_parameters())
 attach(as.list(data_parameters()[params$run, ]))
 nonnull_taxa <- list(list(marginal = seq(n_taxa * prop_nonnull)))
@@ -45,31 +49,15 @@ intervention. An immediate effect on species $i$ may propagate to a lagged-term
 effect on species $j$ if there is a nonzero entry in $A_{ij}$.
 
 ```{r}
-for (i in seq(2, n_lag)) {
-  e <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$marginal
-  f <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$interaction
-
-  nonnull_taxa[[i]] <- list(
-    marginal = unique(c(which(e), which(A[[i - 1]] %*% ifelse(e, 1, 0) != 0))),
-    interaction = unique(c(which(f), which(A[[i - 1]] %*% ifelse(f, 1, 0) != 0)))
-  )
-}
-```
-
-Now we can simulate one example series.
-
-For negative binomial simulation, remember that if the variance is $\mu$, the
-variance is $\mu + \frac{1}{\text{size}}\mu^2$, where $\text{size}$ is the
-number of successes before we stop.
-
-```{r}
-step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C))
+Sigma <- tree_covariance(n_taxa, phylo_alpha, 1)
+noise_model <- \() matnorm(1, n_taxa, Sigma = Sigma)
+step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C), noise_model)
 theta0 <- matrix(2, n_taxa, n_lag + 1)
 w <- random_interventions(n_perturb, n_time, n_subject, n_lag)
 z <- matnorm(n_subject, n_covariates)
 
 sizes <- runif(n_taxa, 1, 5)
-baselines <- rgamma(n_taxa, 50, 5)
+baselines <- rgamma(n_taxa, 10 * baseline_lambda, baseline_lambda)
 x <- generate_samples(step_generator, nbinom_sampler(sizes, baselines), theta0, w, z)
 ```
 
@@ -141,7 +129,7 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 ```
 
 ```{r}
-#save(reads, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+#save(reads, Sigma, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
 ```{r, eval = FALSE, fig.width = 8, fig.height = 4}
@@ -172,9 +160,10 @@ ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(27)){
+#for (i in seq_len(243)){
+for (i in seq(40, 243)) {
   if (i %% 5 == 0) {
-    print(glue::glue("{i}/27"))
+    print(glue::glue("{i}/243"))
   }
   rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
 }
