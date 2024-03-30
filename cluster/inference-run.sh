@@ -12,7 +12,7 @@ Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
 cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .
 tar -zxvf tf_sim.tar.gz
 
-process=$((process + 54))
+#process=$((process + 54))
 
 # run the model configuration
 for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); do
