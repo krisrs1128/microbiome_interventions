@@ -17,7 +17,7 @@ library(glue)
 library(tidygraph)
 library(tidyverse)
 library(tfPaper)
-set.seed(params$replicate)
+set.seed(params$run_id)
 ```
 
 ```{r}
