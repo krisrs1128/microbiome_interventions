@@ -5,7 +5,8 @@
 export batch_size=1
 tar -zxvf microbiome_interventions.tar.gz
 cd microbiome_interventions
-Rscript -e "purrr::map(c('mbtransfer', 'tfPaper'), devtools::install)"
+Rscript -e "devtools::install('tfPaper')"
+Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
 
 # copy over data  
 cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .

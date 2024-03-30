@@ -129,7 +129,7 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 ```
 
 ```{r}
-#save(reads, Sigma, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
+save(reads, Sigma, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
 ```{r, eval = FALSE, fig.width = 8, fig.height = 4}
@@ -155,13 +155,11 @@ ggplot(values_df, aes(time, reorder(subject, value))) +
     axis.text.y = element_blank()
   )
 
-#ggsave("~/Desktop/laboratory/talks/2023/20230414/figures/simulation-hm.png", width = 10, height = 6)
 ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
 ```
 
 ```{r, eval = FALSE}
-#for (i in seq_len(243)){
-for (i in seq(40, 243)) {
+for (i in seq_len(243)){
   if (i %% 5 == 0) {
     print(glue::glue("{i}/243"))
   }
