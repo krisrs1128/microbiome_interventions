@@ -80,6 +80,26 @@ lags <- unlist(hyper[[1]])
 R_deseq <- replicate(max(lags), R_deseq, simplify = FALSE)
 ```
 
+### Averaging baseline
+
+This baseline approach compares each taxon's abundance immediately pre/post
+intervention using a simple t-test. It doesn't differentiate between lagged
+effects and is just aimed at detecting whether the intervention has any effect
+at all.
+
+```{r, averaging_baseline}
+pre <- which(colData(dds)$time > -hyper[[1]]$Q, colData(dds)$time < 0)
+post <- which(colData(dds)$time < hyper[[1]]$Q, colData(dds)$time >= 0)
+
+p_values <- vector(length = nrow(dds))
+for (j in seq_len(nrow(dds))) {
+  p_values[j] <- t.test(assay(dds)[j, pre], assay(dds[j, post]))$p.value
+}
+
+adjp <- p.adjust(p_values, method = "BH")
+R_avg <- list(which(adjp < params$qvalue), which(adjp < params$qvalue))
+```
+
 ### Mirror-based testing
 
 ```{r multisplit_mirrors}
@@ -98,6 +118,7 @@ R_mirror <- map(staxa$taxa, ~ as.integer(str_remove(., "tax")))
 testing_results <- list()
 testing_results$DESeq2 <- lagged_testing_metrics(R_deseq, nonnull_taxa)
 testing_results$mirror <- lagged_testing_metrics(R_mirror, nonnull_taxa)
+testing_results$avg <- lagged_testing_metrics(R_avg, nonnull_taxa)
 testing_results <- bind_rows(testing_results, .id = "method")
 ```
 
