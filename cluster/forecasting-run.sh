@@ -2,7 +2,7 @@
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
 
 # install packages
-export batch_size=1
+export batch_size=3
 tar -zxvf microbiome_interventions.tar.gz
 cd microbiome_interventions
 Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
