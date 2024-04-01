@@ -1,14 +1,13 @@
-
 #' @importFrom phyloseq phyloseq otu_table sample_data phyloseq_to_deseq2
 #' @importFrom DESeq2 sizeFactors estimateSizeFactors
 deseq_normalize <- function(reads, metadata) {
   # construct design for DESeq2 object
   if (!("condition" %in% colnames(metadata))) {
-    fmla <- formula(~ 1)
+    fmla <- formula(~1)
   } else {
-    fmla <- formula(~ condition)
+    fmla <- formula(~condition)
   }
-  
+
   # construct phyloseq and perform normalization
   metadata <- metadata |>
     column_to_rownames("sample") |>
@@ -17,7 +16,7 @@ deseq_normalize <- function(reads, metadata) {
     otu_table(reads, taxa_are_rows = FALSE),
     metadata
   )
-  
+
   dds <- phyloseq_to_deseq2(ps, fmla)
   size_factors <- sizeFactors(estimateSizeFactors(dds, "poscounts"))
   reads / size_factors
@@ -26,7 +25,7 @@ deseq_normalize <- function(reads, metadata) {
 #' @importFrom mbImpute mbImpute
 #' @importFrom parallel detectCores
 #' @export
-normalize <-  function(reads, method = "none", metadata = NULL, ...) {
+normalize <- function(reads, method = "none", metadata = NULL, ...) {
   if (is.null(metadata)) {
     metadata <- data.frame(dummy = rep(1, nrow(reads)), sample = rownames(reads))
   }
@@ -41,7 +40,7 @@ normalize <-  function(reads, method = "none", metadata = NULL, ...) {
     condition <- pull(metadata, condition)
     metadata <- select(metadata, -condition:-sample)
     if (any(apply(metadata, 2, class) %in% c("factor", "character"))) {
-      metadata <- model.matrix(~ . , metadata)[, -1]
+      metadata <- model.matrix(~., metadata)[, -1]
     }
 
     if (ncol(metadata) > 0) {

@@ -1,7 +1,7 @@
 #' @importFrom ggplot2 theme_minimal theme
 #' @export
 my_theme <- function() {
-  th <- theme_minimal() + 
+  th <- theme_minimal() +
     theme(
       panel.grid.minor = element_blank(),
       panel.background = element_rect(fill = "#f7f7f7"),

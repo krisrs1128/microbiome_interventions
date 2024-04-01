@@ -1,4 +1,3 @@
-
 #' @export
 step_t <- function(f, g, h, noise_gen) {
   fun <- function(x, w, z) {
@@ -12,7 +11,7 @@ step_t <- function(f, g, h, noise_gen) {
 #' @export
 tree_covariance <- function(n_taxa, alpha, beta = 1, gamma = 1) {
   D <- distances(make_tree(n_taxa, 2))
-  beta / (D + gamma) ^ alpha
+  beta / (D + gamma)^alpha
 }
 
 #' @export
@@ -23,7 +22,7 @@ matnorm <- function(N, M, mu = 0, Sigma = NULL) {
   if (is.null(Sigma)) {
     Sigma <- diag(1, nrow = M)
   }
-  MASS::mvrnorm(N, mu, Sigma)
+  mvnfast::rmvn(N, mu, Sigma)
 }
 
 #' @export
@@ -43,7 +42,7 @@ factorized_step <- function(J, K, D = NULL, ...) {
   if (is.null(D)) {
     D <- J
   }
-  
+
   Theta <- matunif(J, K, ...)
   B <- matunifband(K, D, ...)
   list(B = B, Theta = Theta)
@@ -63,7 +62,7 @@ sparsify_rows <- function(B, nonnull_ix = NULL, sparsity_frac = 0.8) {
   if (is.null(nonnull_ix)) {
     nonnull_ix <- sample(nrow(B[[1]]), sparsity_frac * nrow(B[[1]]))
   }
-  
+
   for (i in seq_along(B)) {
     B[[i]][-nonnull_ix, ] <- 0
   }
@@ -74,7 +73,7 @@ sparsify_rows <- function(B, nonnull_ix = NULL, sparsity_frac = 0.8) {
 linear_sum <- function(coefs) {
   n_lag <- length(coefs)
   n_taxa <- nrow(coefs[[1]])
-  
+
   fun <- function(x) {
     result <- matrix(0, n_taxa, 1)
 
@@ -85,7 +84,7 @@ linear_sum <- function(coefs) {
 
     result
   }
-  
+
   list(fun = fun, lag = n_lag, coefs = coefs)
 }
 
@@ -95,7 +94,7 @@ low_rank_step <- function(n_taxa, n_latent, n_perturb = NULL, n_lag = 1, ...) {
   for (l in seq_len(n_lag)) {
     coefs[[l]] <- factorized_step(n_taxa, n_latent, n_perturb, ...)
   }
-  
+
   coefs |>
     map(~ .$Theta %*% .$B)
 }
@@ -131,12 +130,12 @@ random_interventions <- function(n_perturb, n_time, n_subject, n_lag = 3) {
   w <- replicate(n_subject, matrix(0, n_perturb, n_time), simplify = FALSE)
   for (i in seq_along(w)) {
     for (j in seq_len(n_perturb)) {
-      start_ix <- sample((n_time / 3) : (n_time - n_lag), 1)
-      end_ix <- start_ix + sample((0.5 * n_lag) : (1.5 * n_lag), 1)
+      start_ix <- sample((n_time / 3):(n_time - n_lag), 1)
+      end_ix <- start_ix + sample((0.5 * n_lag):(1.5 * n_lag), 1)
       w[[i]][j, start_ix:min(n_time, end_ix)] <- 1
     }
   }
-  
+
   w
 }
 
@@ -144,7 +143,7 @@ random_interventions <- function(n_perturb, n_time, n_subject, n_lag = 3) {
 interaction_sum <- function(coefs) {
   n_lag <- length(coefs)
   n_taxa <- nrow(coefs[[1]])
-  
+
   fun <- function(z, w) {
     result <- matrix(0, n_taxa, 1)
     for (l in seq(n_lag)) {
@@ -152,7 +151,7 @@ interaction_sum <- function(coefs) {
     }
     result
   }
-  
+
   list(fun = fun, PQ = n_lag, coefs = coefs)
 }
 
@@ -162,7 +161,7 @@ gaussian_sampler <- function(sigma = 1) {
     if (length(sigma) == 1) {
       sigma <- rep(sigma, length(theta))
     }
-  
+
     rnorm(length(theta), theta, sigma)
   }
 }
@@ -178,7 +177,7 @@ nbinom_sampler <- function(size = 1, baseline = 1) {
     }
 
     mu <- baseline * exp(log_theta)
-    rnbinom(length(mu), mu  = mu, size = size)
+    rnbinom(length(mu), mu = mu, size = size)
   }
 }
 
@@ -189,14 +188,14 @@ generate_sample <- function(theta0, w, z, step_generator, sampler) {
   n_taxa <- nrow(theta0)
   P <- step_generator$params$P
   Q <- step_generator$params$Q
-  
+
   theta <- cbind(theta0, matrix(0, n_taxa, n_time - ncol(theta0)))
   x <- matrix(0, n_taxa, n_time)
   for (i in seq(max(P, Q) + 1, n_time)) {
-    theta[, i] <- step_generator$fun(theta[, (i - P) : (i - 1), drop=F], w[, (i - Q + 1) : i, drop=F], z)
+    theta[, i] <- step_generator$fun(theta[, (i - P):(i - 1), drop = F], w[, (i - Q + 1):i, drop = F], z)
     x[, i] <- sampler(theta[, i])
   }
-  
+
   x
 }
 
@@ -207,5 +206,5 @@ generate_samples <- function(step_generator, sampler, theta0, w, z) {
     x[[i]] <- generate_sample(theta0, w[[i]], z[i, ], step_generator, sampler)
     rownames(x[[i]]) <- str_c("tax", seq_len(nrow(x[[i]])))
   }
-  x  
+  x
 }

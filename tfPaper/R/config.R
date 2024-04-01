@@ -1,4 +1,3 @@
-
 #' @importFrom dplyr mutate filter
 #' @importFrom glue glue
 #' @importFrom tidyr separate
@@ -19,15 +18,15 @@ method_configurations <- function(data_paths) {
 #' @importFrom dplyr mutate
 #' @importFrom glue glue
 #' @export
-data_parameters <- function(output_root="~/Downloads/") {
+data_parameters <- function(output_root = "~/Downloads/") {
   expand.grid(
     n_subject = 50,
     n_time = 30,
     prop_nonnull = c(0.1, 0.2, 0.4),
     signal_B = c(0.25, 0.5, 1),
     n_taxa = c(100, 200, 400),
-    phylo_alpha = c(0.1, 1, 10),
-    baseline_lambda = c(0.1, 1, 10)
+    phylo_alpha = c(0.1, 10),
+    baseline_lambda = c(0.1, 10)
   ) |>
     mutate(output_path = glue("{output_root}/sim_input_{str_pad(row_number(), 3, 'left', '0')}.rda"))
 }
@@ -36,7 +35,7 @@ data_parameters <- function(output_root="~/Downloads/") {
 fixed_parameters <- function() {
   list(
     n_perturb = 1,
-    n_covariates = 1, 
+    n_covariates = 1,
     prop_interaction = 0.4,
     n_latent = 4,
     normalizer_A = 0.5,

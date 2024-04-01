@@ -1,4 +1,3 @@
-
 #' @export
 train_test_split <- function(ts_inter, p_test = 0.2) {
   N <- length(ts_inter)
@@ -13,7 +12,7 @@ intervention_start <- function(interventions, offset = 0) {
   } else {
     start_ix <- ncol(interventions) / 2
   }
-  
+
   start_ix + offset
 }
 
@@ -28,17 +27,17 @@ evaluation <- function(y, y_hat, test_ix) {
     if (length(test_ix[[i]]) == 0) {
       residuals[[i]] <- rep(NA, nrow(y_hat[[i]]))
     } else {
-      residuals[[i]]<- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
+      residuals[[i]] <- values(y[[i]][, test_ix[[i]]]) - values(y_hat[[i]][, test_ix[[i]]])
     }
 
     avg_err[[i]] <- data.frame(
-      mse = mean(residuals[[i]] ^ 2),
+      mse = mean(residuals[[i]]^2),
       mae = mean(abs(residuals[[i]])),
-      mse_std = mean(residuals[[i]] ^ 2) / var(as.numeric(values(y[[i]][, -test_ix[[i]]]))),
+      mse_std = mean(residuals[[i]]^2) / var(as.numeric(values(y[[i]][, -test_ix[[i]]]))),
       mae_std = mean(abs(residuals[[i]])) / IQR(as.numeric(values(y[[i]][, -test_ix[[i]]])))
     )
   }
-  
+
   bind_rows(avg_err, .id = "subject")
 }
 
@@ -54,7 +53,7 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1, see
   fits <- list()
   y_hat <- list()
   metrics <- list()
-  
+
   for (k in seq_len(K)) {
     if (!is.null(seeds)) {
       set.seed(seeds[k])
@@ -72,14 +71,14 @@ cross_validate <- function(ts_inter, train, K = 5, n_ahead = 5, offset = -1, see
       interventions(stest[[i]]) <- interventions(stest[[i]])[, predict_ix, drop = FALSE]
       stest[[i]]@time <- stest[[i]]@time[predict_ix]
     }
-    
+
     y_hat[[k]] <- predict(fits[[k]], stest)
     for (h in seq_len(n_ahead)) {
       test_ix <- as.list(t_starts + h)
       metrics[[glue("{k}-{h}")]] <- evaluation(splits$test, y_hat[[k]], test_ix)
     }
   }
-  
+
   metrics <- bind_rows(metrics, .id = "fold_lag") |>
     separate(fold_lag, c("fold", "lag"))
   list(fits = fits, y_hat = y_hat, metrics = metrics)
