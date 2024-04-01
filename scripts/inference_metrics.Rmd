@@ -70,11 +70,11 @@ dds <- phyloseq(otu_table(reads, taxa_are_rows = FALSE), samples) |>
 
 ```{r, deseq_postprocessing}
 R_deseq <- results(dds, name = "condition") |>
-    data.frame() |>
-    rownames_to_column("taxon") |>
-    filter(padj < params$qvalue) |>
-    mutate(taxon = as.integer(str_remove(taxon, "tax"))) |>
-    pull(taxon)
+  data.frame() |>
+  rownames_to_column("taxon") |>
+  filter(padj < params$qvalue) |>
+  mutate(taxon = as.integer(str_remove(taxon, "tax"))) |>
+  pull(taxon)
 
 lags <- unlist(hyper[[1]])
 R_deseq <- replicate(max(lags), R_deseq, simplify = FALSE)
@@ -97,7 +97,7 @@ for (j in seq_len(nrow(dds))) {
 }
 
 adjp <- p.adjust(p_values, method = "BH")
-R_avg <- list(which(adjp < params$qvalue), which(adjp < params$qvalue))
+R_avg <- replicate(max(lags), which(adjp < params$qvalue), simplify = FALSE)
 ```
 
 ### Mirror-based testing
