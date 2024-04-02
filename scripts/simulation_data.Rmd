@@ -49,8 +49,19 @@ intervention. An immediate effect on species $i$ may propagate to a lagged-term
 effect on species $j$ if there is a nonzero entry in $A_{ij}$.
 
 ```{r}
+for (i in seq(2, n_lag)) {
+  e <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$marginal
+  f <- seq_len(n_taxa) %in% nonnull_taxa[[i - 1]]$interaction
+  nonnull_taxa[[i]] <- list(
+    marginal = unique(c(which(e), which(A[[i - 1]] %*% ifelse(e, 1, 0) != 0))),
+    interaction = unique(c(which(f), which(A[[i - 1]] %*% ifelse(f, 1, 0) != 0)))
+  )
+}
+```
+
+```{r}
 Sigma <- tree_covariance(n_taxa, phylo_alpha, 1)
-noise_model <- \() matnorm(1, n_taxa, Sigma = Sigma)
+noise_model <- \() matnorm(1, n_taxa, Sigma = Sigma)[1, ]
 step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C), noise_model)
 theta0 <- matrix(2, n_taxa, n_lag + 1)
 w <- random_interventions(n_perturb, n_time, n_subject, n_lag)
@@ -159,9 +170,9 @@ ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(243)){
+for (i in seq_len(108)){
   if (i %% 5 == 0) {
-    print(glue::glue("{i}/243"))
+    print(glue::glue("{i}/108"))
   }
   rmarkdown::render("simulation_data.Rmd", params = list(run_id = i), quiet = TRUE)
 }
