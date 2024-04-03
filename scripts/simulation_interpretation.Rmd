@@ -112,7 +112,7 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
   p <- ggplot(cur_metrics) +
     geom_boxplot(
       aes(
-        interaction(signal_B, baseline_lambda), 
+        signal_B, 
         mae, 
         fill = interaction(factor(method), hyperparameter, sep = ""), 
         col = interaction(factor(method), hyperparameter, sep = "")), 
@@ -122,7 +122,7 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
     scale_x_discrete(labels = ~ gsub("\\.λ", ",\tλ", .x)) +
     scale_fill_brewer(palette = "Set1") +
     scale_color_brewer(palette = "Set1") +
-    facet_grid(phylo_alpha ~ n_taxa + prop_nonnull) +
+    facet_grid(phylo_alpha + baseline_lambda ~ n_taxa + prop_nonnull) +
     labs(
       x = "Number of Taxa", 
       y = "Mean Absolute Error (Lags H = 1, ..., 5)",
@@ -164,18 +164,19 @@ testing_results <- paths |>
 ```{r, fig.height = 6.5, fig.width = 11}
 pal <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
 testing_results |>
-  filter(type == "marginal") |>
+  filter(type == "marginal", n_taxa == 200) |>
   mutate(
     prop_nonnull = glue("{100 * prop_nonnull}% nonnull"),
     signal_B = glue("b = {signal_B}")
   ) |>
   ggplot() +
   geom_vline(xintercept = 0.2, col = "#898989", size = 1) +
+  geom_point(aes(fdp, power, shape = signal_B), size = 3.5) +
   geom_point(aes(fdp, power, shape = signal_B, col = lag), size = 3) +
   scale_color_manual(values = pal) +
   scale_y_continuous(breaks = c(.5, 1)) +
   scale_x_continuous(breaks = c(0.2, 0.4, 0.6, 0.8)) +
-  facet_grid(normalization + n_taxa ~ prop_nonnull + method) +
+  facet_grid(normalization + phylo_alpha ~ prop_nonnull + method) +
   labs(x = "False Discovery Proportion", y = "Power", col = "Lag", shape = "Signal Strength") +
   theme(
     axis.text = element_text(size = 10),

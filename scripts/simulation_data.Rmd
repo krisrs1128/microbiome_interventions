@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```{r}
 library(stringr)
 library(glue)
+library(scico)
 library(tidygraph)
 library(tidyverse)
 library(tfPaper)
@@ -60,7 +61,7 @@ for (i in seq(2, n_lag)) {
 ```
 
 ```{r}
-Sigma <- tree_covariance(n_taxa, phylo_alpha, 1)
+Sigma <- tree_covariance(n_taxa, phylo_alpha)
 noise_model <- \() matnorm(1, n_taxa, Sigma = Sigma)[1, ]
 step_generator <- step_t(linear_sum(A), linear_sum(B), interaction_sum(C), noise_model)
 theta0 <- matrix(2, n_taxa, n_lag + 1)
@@ -167,6 +168,46 @@ ggplot(values_df, aes(time, reorder(subject, value))) +
   )
 
 ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
+```
+
+```{r, eval = FALSE}
+Sigma0 <- tree_covariance(100, 10)
+Sigma1 <- tree_covariance(100, 0.1)
+as_tibble(Sigma1) |>
+  mutate(i = row_number()) |>
+  pivot_longer(-i, names_to = "j") |>
+  bind_rows(
+    as_tibble(Sigma0) |> 
+      mutate(i = row_number()) |>
+      pivot_longer(-i, names_to = "j"),
+    .id = "source"
+  ) |>
+  mutate(
+    j = as.numeric(str_remove(j, "V")),
+    source = ifelse(source == "1", "α = 0.1", "α = 10")
+    ) |>
+  ggplot() +
+  geom_tile(aes(i, j, fill = value, col = value)) +
+  scale_fill_scico(palette = "glasgow") +
+  scale_color_scico(palette = "glasgow") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(
+    fill = expression(Sigma[ij]),
+    color = expression(Sigma[ij]),
+    title = "Covariance Matrices for ϵ"
+  ) +
+  coord_fixed() +
+  facet_wrap(~ source) +
+  theme(
+    plot.title = element_text(size = 23),
+    strip.text = element_text(size = 20),
+    legend.title = element_text(size = 23),
+    legend.text = element_text(size = 16),
+    legend.key.size = unit(2, "cm"),
+    legend.key.height = unit(0.5, "cm")
+  )
+ggsave("covariance_comparison.png", width=9, height=6)
 ```
 
 ```{r, eval = FALSE}
