@@ -11,6 +11,7 @@ date: "`r Sys.Date()`"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+params <- list(outputs_dir = "data/simulation_output", outputs_filter = "*rda")
 ```
 
 ```{r}
@@ -96,6 +97,7 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
       hyperparameter = glue("{rho}{P}"),
       method = case_match(method, "mdsine" ~ "MDSINE2", "fido" ~ "fido", "mbtransfer" ~ "mbtransfer"),
       baseline_lambda = glue("λ = {baseline_lambda}"),
+      phylo_alpha = glue("𝛼 = {phylo_alpha}"),
       signal_B = glue("b = {signal_B}")
     ) |>
     filter(normalization == norm_n)
@@ -112,16 +114,15 @@ for (norm_n in c("none", "DESeq2", "DESeq2-asinh")) {
       aes(
         interaction(signal_B, baseline_lambda), 
         mae, 
-        linetype = factor(phylo_alpha), 
         fill = interaction(factor(method), hyperparameter, sep = ""), 
         col = interaction(factor(method), hyperparameter, sep = "")), 
       alpha = 0.5,
       position = position_dodge2(preserve = "single")
       ) +
-    scale_x_discrete(labels = ~ gsub("\\.λ", "\nλ", .x)) +
+    scale_x_discrete(labels = ~ gsub("\\.λ", ",\tλ", .x)) +
     scale_fill_brewer(palette = "Set1") +
     scale_color_brewer(palette = "Set1") +
-    facet_wrap(n_taxa ~ prop_nonnull, ncol = 3) +
+    facet_grid(phylo_alpha ~ n_taxa + prop_nonnull) +
     labs(
       x = "Number of Taxa", 
       y = "Mean Absolute Error (Lags H = 1, ..., 5)",

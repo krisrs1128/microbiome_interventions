@@ -170,7 +170,7 @@ ggsave("simulation-hm.png", width = 8, height = 4, dpi = 1000)
 ```
 
 ```{r, eval = FALSE}
-for (i in seq_len(108)){
+for (i in seq_len(108)) {
   if (i %% 5 == 0) {
     print(glue::glue("{i}/108"))
   }
