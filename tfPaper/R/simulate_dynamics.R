@@ -182,28 +182,29 @@ nbinom_sampler <- function(size = 1, baseline = 1) {
 }
 
 #' @export
-generate_sample <- function(theta0, w, z, step_generator, sampler) {
+generate_sample <- function(log_theta0, w, z, step_generator, sampler) {
   result <- list()
   n_time <- ncol(w)
-  n_taxa <- nrow(theta0)
+  n_taxa <- nrow(log_theta0)
   P <- step_generator$params$P
   Q <- step_generator$params$Q
 
-  theta <- cbind(theta0, matrix(0, n_taxa, n_time - ncol(theta0)))
+  log_theta <- cbind(log_theta0, matrix(0, n_taxa, n_time - ncol(log_theta0)))
   x <- matrix(0, n_taxa, n_time)
   for (i in seq(max(P, Q) + 1, n_time)) {
-    theta[, i] <- step_generator$fun(theta[, (i - P):(i - 1), drop = F], w[, (i - Q + 1):i, drop = F], z)
-    x[, i] <- sampler(theta[, i])
+    log_theta[, i] <- step_generator$fun(log_theta[, (i - P):(i - 1), drop = F], w[, (i - Q + 1):i, drop = F], z)
+    x[, i] <- sampler(log_theta[, i])
   }
+  browser()
 
   x
 }
 
 #' @export
-generate_samples <- function(step_generator, sampler, theta0, w, z) {
+generate_samples <- function(step_generator, sampler, log_theta0, w, z) {
   x <- list()
   for (i in seq_len(nrow(z))) {
-    x[[i]] <- generate_sample(theta0, w[[i]], z[i, ], step_generator, sampler)
+    x[[i]] <- generate_sample(log_theta0, w[[i]], z[i, ], step_generator, sampler)
     rownames(x[[i]]) <- str_c("tax", seq_len(nrow(x[[i]])))
   }
   x
