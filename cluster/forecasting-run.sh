@@ -5,9 +5,9 @@
 export batch_size=3
 tar -zxvf microbiome_interventions.tar.gz
 cd microbiome_interventions
-Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
-Rscript -e "devtools::install_github('gathanei/xyz')"
 Rscript -e "purrr::map(c('mdsine', 'tfPaper', 'fido2'), devtools::install)"
+Rscript -e "devtools::install_github('gathanei/xyz')"
+Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
 Rscript -e "mdsine::install_mdsine()"
 
 # copy over data
