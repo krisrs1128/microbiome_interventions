@@ -104,7 +104,7 @@ R_avg <- replicate(max(lags), which(adjp < params$qvalue), simplify = FALSE)
 
 ```{r multisplit_mirrors}
 tr_fun <- function(x) {
-  mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q)
+  mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q, interactions = "search")
 }
 
 ws <- steps(c("P1" = TRUE), L = max(lags))
