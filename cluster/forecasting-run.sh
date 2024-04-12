@@ -2,10 +2,15 @@
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
 
 # copy and check if results already exist
-cp /staging/ksankaran/microbiome_interventions/forecasting-${process}.* . || true
-tar -zxvf forecasting-${process}.tar.gz || true
+test_output=/staging/ksankaran/microbiome_interventions/forecasting-${process}.tar.gz
+if [ -f $test_output ]; then
+  cp $test_output .
+  tar -zxvf forecasting-${process}.tar.gz || true
+  file_num=$(ls -l forecasting-${process}/*.rda | wc -l) || true
+else
+  file_num=0
+fi
 
-file_num=$(ls -l forecasting-${process}/*.rda | wc -l) || true
 if [[ $file_num -lt 1 ]]; then
 
   # install packages
