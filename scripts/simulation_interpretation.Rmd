@@ -164,7 +164,7 @@ testing_results <- paths |>
 ```{r, fig.height = 6.5, fig.width = 11}
 pal <- c("#c6dbef", "#6baed6", "#2171b5", "#084594")
 testing_results |>
-  filter(type == "marginal", n_taxa == 200) |>
+  filter(type == "marginal", n_taxa == 400) |>
   mutate(
     prop_nonnull = glue("{100 * prop_nonnull}% nonnull"),
     signal_B = glue("b = {signal_B}")
