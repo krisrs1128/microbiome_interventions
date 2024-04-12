@@ -5,7 +5,7 @@
 cp /staging/ksankaran/microbiome_interventions/forecasting-${process}.* . || true
 tar -zxvf forecasting-${process}.tar.gz || true
 
-file_num=$(ls -l forecasting-${process}/*.rda | wc -l)
+file_num=$(ls -l forecasting-${process}/*.rda | wc -l) || true
 if [[ $file_num -lt 1 ]]; then
 
   # install packages

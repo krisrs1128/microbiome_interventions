@@ -5,7 +5,7 @@
 cp /staging/ksankaran/microbiome_interventions/inference-${process}.* . || true
 tar -zxvf inference-${process}.tar.gz || true
 
-file_num=$(ls -l inference-${process}/*.rda | wc -l)
+file_num=$(ls -l inference-${process}/*.rda | wc -l) || true
 if [[ $file_num -lt 1 ]]; then
 
   # install packages
