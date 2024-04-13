@@ -104,10 +104,10 @@ R_avg <- replicate(max(lags), which(adjp < params$qvalue), simplify = FALSE)
 
 ```{r multisplit_mirrors}
 tr_fun <- function(x) {
-  mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q, interactions = "search")
+  mbtransfer(x, P = hyper[[1]]$P, Q = hyper[[1]]$Q)
 }
 
-ws <- steps(c("P1" = TRUE), L = max(lags))
+ws <- steps(c("P1" = TRUE), lengths = max(lags), L = max(lags))
 staxa <- select_taxa(ts, ws[[1]], ws[[2]], tr_fun, n_splits = 25, qvalue = params$qvalue)
 R_mirror <- map(staxa$taxa, ~ as.integer(str_remove(., "tax")))
 ```

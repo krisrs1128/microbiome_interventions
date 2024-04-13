@@ -86,7 +86,7 @@ tr_fun <- function(method, hyper = list()) {
     if (method == "mdsine") {
       mdsine(ts, hyper$taxonomy)
     } else if (method == "mbtransfer") {
-      mbtransfer(ts, P = hyper$P, Q = hyper$Q, interactions = "search")
+      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
     } else if (method == "fido") {
       fido(ts, sigma = hyper$sigma, rho = hyper$rho)
     }
