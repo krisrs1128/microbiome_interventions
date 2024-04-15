@@ -1,0 +1,148 @@
+---
+title: "Diet Interventions - Fido and MDSINE2 Applications"
+output: rmarkdown::html_document
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  comment = "#>",
+  cache = TRUE
+)
+```
+
+### Data and Problem Context
+
+```{r setup}
+library(mbtransfer)
+library(fido2)
+library(mdsine)
+library(tidyverse)
+library(glue)
+#library(tidymodels)
+library(patchwork)
+library(RefManageR)
+th <- theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "#f7f7f7"),
+    panel.border = element_rect(fill = NA, color = "#0c0c0c", linewidth = 0.6),
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+theme_set(th)
+bib <- ReadBib("references.bib")
+set.seed(20230524)
+```
+
+The block below reads in the data. These are [lightly processed](https://github.com/krisrs1128/microbiome_interventions/blob/main/scripts/data_preprocessing.Rmd) versions of data
+hosted in the [`MITRE` repository](https://github.com/gerberlab/mitre/tree/master/mitre/example_data/david)
+`r Citep(bib, "Bogart2019MITREIF")`.  We've selected only those features that
+are used in this analysis, and we have reshaped the data into a format that can
+be used by our `ts_from_dfs` function.
+
+```{r}
+subject <- read_csv("https://figshare.com/ndownloader/files/40275934/subject.csv")
+interventions <- read_csv("https://figshare.com/ndownloader/files/40279171/interventions.csv") |>
+  column_to_rownames("sample")
+reads <- read_csv("https://figshare.com/ndownloader/files/40279108/reads.csv") |>
+  column_to_rownames("sample")
+samples <- read_csv("https://figshare.com/ndownloader/files/40275943/samples.csv")
+```
+
+Next, we unify the read counts, subject variables, and intervention status into
+a `ts_inter` class. All of `mbtransfer`'s functions expect data structured
+according to this class. We interpolate all the timepoints onto a daily grid.
+This is not the most satisfying transformation, since it can create the
+impression that there is not much noise between samples. However, it is common
+practice (e.g., `r `Citep(bib, "RuizPerez2019DynamicBN")`), and it is better
+than entirely ignoring variation in the gaps between samples.
+
+```{r}
+ts <- as.matrix(reads) |>
+  ts_from_dfs(interventions, samples, subject) |>
+  interpolate(method = "linear")
+
+ts
+```
+
+Before doing any modeling, let's visualize some of the raw data. The plot below
+shows interpolated series for the seven most abundant taxa. For some subjects,
+there is a clear, nearly universal affect -- e.g., OTU000011 is clearly depleted
+in the Animal diet. Other taxa have more ambiguous effects (does OTU000019.
+increase in plant?), or seem potentially specialized to subpopulations (e.g.,
+OTU000003 in Animal). Our transfer function models should help us provide a
+precise characterization of the intervention effects, together with some
+uncertainty quantification.
+
+### Prediction
+
+We'll first fit models using the first eight, pre-intervention timepoints from
+every subject. It's possible that this model might overfit to the (relatively
+small) sample, but it's still usually helpful to compare in and out-of-sample
+prediction performance. This is because poor performance even within the
+in-sample setting might mean the assumed model class is not rich enough. We will
+use both mdsine2 and fido2.
+
+```{r}
+subject_data(ts) <- subject_data(ts) |>
+  select(-diet)
+
+fits <- list(mdsine = list(), fido = list())
+ts_preds <- list(mdsine = list(), fido = list())
+fmla <- ~ 1 + time + Plant + Animal + subject
+fits[["fido"]][["in-sample"]] <- fido(ts, 2, 2, fmla)
+ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts, fmla)
+ts_missing <- subset_values(ts, 1:8)
+ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts_missing, fmla)
+```
+
+The block below instead trains on five subjects from each intervention group and
+makes predictions for those who were held out.
+
+```{r}
+fits[["fido"]][["out-of-sample"]] <- fido(ts[c(1:5, 11:15)], 2, 2, fmla)
+ts_preds[["fido"]][["out-of-sample"]] <- fido_predict(fits[["fido"]][["out-of-sample"]], ts_missing[c(6:10, 16:20)], fmla)
+```
+
+
+```{r, fig.width = 10, fig.height = 6}
+subject_data(ts_preds[["fido"]][["in-sample"]]) <- subject_data(ts_preds[["fido"]][["in-sample"]]) |>
+  mutate(subject = as.factor(as.character(subject)))
+subject_data(ts_preds[["fido"]][["out-of-sample"]]) <- subject_data(ts_preds[["fido"]][["out-of-sample"]]) |>
+  mutate(subject = as.factor(as.character(subject)))
+reshaped_preds <- map_dfr(ts_preds[["fido"]], ~ reshape_preds(ts, .), .id = "generalization") |>
+  filter(h > 0, h < 6)
+
+reshaped_preds |>
+  mutate(h = glue("lag {h}")) |>
+  ggplot() +
+  geom_abline(slope = 1, col = "#400610") +
+  geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
+  facet_grid(factor(quantile, rev(levels(quantile))) ~ h, scales = "free_y") +
+  labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
+  scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
+  scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
+  scale_color_manual(values = c("#A65883", "#6593A6")) +
+  guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+  theme(
+    axis.text = element_text(size = 10),
+    panel.spacing = unit(0, "line"),
+    strip.text.y = element_text(angle = 0, size = 12),
+    strip.text.x = element_text(angle = 0, size = 12),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 11),
+  )
+```
+
+```{r}
+taxonomy = data.frame(tax_id = 1:ncol(reads), name = paste0("tax", 1:ncol(reads)), kingdom = "bacteria", phylum = NA, class = NA, order = NA, family = NA, genus = NA, species = NA, sequence = NA)
+fit <- mdsine(ts, taxonomy)
+ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts, fmla)
+ts_missing <- subset_values(ts, 1:8)
+ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts_missing, fmla)
+
+```
