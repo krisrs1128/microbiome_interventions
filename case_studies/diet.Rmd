@@ -21,7 +21,6 @@ library(tidyverse)
 library(glue)
 library(mdsine)
 library(fido2)
-library(RefManageR)
 th <- theme_bw() +
   theme(
     panel.grid.minor = element_blank(),
@@ -32,13 +31,11 @@ th <- theme_bw() +
     legend.position = "bottom"
   )
 theme_set(th)
-bib <- ReadBib("references.bib")
 set.seed(20230524)
 ```
 
 The block below reads in the data. These are [lightly processed](https://github.com/krisrs1128/microbiome_interventions/blob/main/scripts/data_preprocessing.Rmd) versions of data
-hosted in the [`MITRE` repository](https://github.com/gerberlab/mitre/tree/master/mitre/example_data/david)
-`r Citep(bib, "Bogart2019MITREIF")`.  We've selected only those features that
+hosted in the [`MITRE` repository](https://github.com/gerberlab/mitre/tree/master/mitre/example_data/david).  We've selected only those features that
 are used in this analysis, and we have reshaped the data into a format that can
 be used by our `ts_from_dfs` function.
 
@@ -54,10 +51,6 @@ samples <- read_csv("https://figshare.com/ndownloader/files/40275943/samples.csv
 Next, we unify the read counts, subject variables, and intervention status into
 a `ts_inter` class. All of `mbtransfer`'s functions expect data structured
 according to this class. We interpolate all the timepoints onto a daily grid.
-This is not the most satisfying transformation, since it can create the
-impression that there is not much noise between samples. However, it is common
-practice (e.g., `r `Citep(bib, "RuizPerez2019DynamicBN")`), and it is better
-than entirely ignoring variation in the gaps between samples.
 
 ```{r}
 ts <- as.matrix(reads) |>

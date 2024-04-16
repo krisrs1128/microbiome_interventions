@@ -15,3 +15,5 @@ data
 *.Rproj
 *.tar.gz
 *buildignore
+*.png
+*cache*
