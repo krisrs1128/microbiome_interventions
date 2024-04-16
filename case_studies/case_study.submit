@@ -1,0 +1,14 @@
+universe = docker
+docker_image = krisrs1128/mi:20230506
+log = /home/ksankaran/logs/mi-f-$(Process).log
+error = /home/ksankaran/logs/mi-f-$(Process).err
+output = /home/ksankaran/logs/mi-f-$(Process).out
+executable = case_study.sh
+environment = "process=$(Process)"
+should_transfer_files = YES
+transfer_input_files = microbiome_interventions.tar.gz
+request_cpus = 1
+request_memory = 16GB
+request_disk = 2GB
+requirements = (Target.HasCHTCStaging == true)
+queue
