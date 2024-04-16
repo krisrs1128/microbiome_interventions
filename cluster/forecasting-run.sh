@@ -1,8 +1,10 @@
 #!/bin/bash
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
+  
+tar -zxvf outputs.tar.gz
 
 # copy and check if results already exist
-test_output=/staging/ksankaran/microbiome_interventions/forecasting-${process}.tar.gz
+test_output=outputs/forecasting-${process}.tar.gz
 if [ -f $test_output ]; then
   cp $test_output .
   tar -zxvf forecasting-${process}.tar.gz || true
@@ -39,5 +41,4 @@ if [[ $file_num -lt 1 ]]; then
   mv scripts/*rda forecasting-${process}
   mv scripts/*html forecasting-${process}
   tar -zcvf forecasting-${process}.tar.gz forecasting-${process}
-  cp forecasting-*tar.gz /staging/ksankaran/microbiome_interventions/
 fi
