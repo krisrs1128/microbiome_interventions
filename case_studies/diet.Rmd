@@ -17,12 +17,10 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(mbtransfer)
-library(fido2)
-library(mdsine)
 library(tidyverse)
 library(glue)
-#library(tidymodels)
-library(patchwork)
+library(mdsine)
+library(fido2)
 library(RefManageR)
 th <- theme_bw() +
   theme(
@@ -88,61 +86,88 @@ in-sample setting might mean the assumed model class is not rich enough. We will
 use both mdsine2 and fido2.
 
 ```{r}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    if (method == "mdsine") {
+      mdsine(ts, hyper$taxonomy)
+    } else if (method == "mbtransfer") {
+      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
+    } else if (method == "fido") {
+      fido(ts, sigma = hyper$sigma, rho = hyper$rho, design = hyper$design)
+    }
+  }
+}
+
+evaluate_splits <- function(ts, f, ...) {
+  fits <- list()
+  ts_preds <- list()
+
+  # in-sample performance
+  fits[["in-sample"]] <- f(ts)
+  ts_missing <- subset_values(ts, 1:8)
+  ts_preds[["in-sample"]] <- predict(fits[["in-sample"]], ts_missing, ...)
+  subject_data(ts_preds[["in-sample"]]) <- subject_data(ts_preds[["in-sample"]]) |>
+    mutate(subject = as.factor(subject))
+
+  # out-of-sample performance
+  fits[["out-of-sample"]] <- f(ts[c(1:5, 11:15)])
+  ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[c(6:10, 16:20)], ...)
+  subject_data(ts_preds[["out-of-sample"]]) <- subject_data(ts_preds[["out-of-sample"]]) |>
+    mutate(subject = as.factor(subject))
+  list(fits = fits, ts_preds = ts_preds)
+}
+
+plot_predictions <- function(ts, ts_preds) {
+  reshaped_preds <- map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
+    filter(h > 0, h < 6)
+
+  p <- reshaped_preds |>
+    mutate(h = glue("lag {h}")) |>
+    ggplot() +
+    geom_abline(slope = 1, col = "#400610") +
+    geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
+    facet_grid(factor(quantile, rev(levels(quantile))) ~ h, scales = "free_y") +
+    labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
+    scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_color_manual(values = c("#A65883", "#6593A6")) +
+    guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+    theme(
+      axis.text = element_text(size = 10),
+      panel.spacing = unit(0, "line"),
+      strip.text.y = element_text(angle = 0, size = 12),
+      strip.text.x = element_text(angle = 0, size = 12),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 11),
+    )
+
+  correlation <- reshaped_preds |>
+    group_by(h, quantile, generalization) |>
+    summarise(correlation = round(cor(y, y_hat), 4)) |>
+    pivot_wider(names_from = "generalization", values_from = "correlation") |>
+    arrange(desc(quantile), h)
+
+  list(p = p, correlation = correlation)
+}
+```
+
+```{r}
 subject_data(ts) <- subject_data(ts) |>
-  select(-diet)
+  select(-diet) |>
+  mutate(subject = as.factor(subject))
 
-fits <- list(mdsine = list(), fido = list())
-ts_preds <- list(mdsine = list(), fido = list())
-fmla <- ~ 1 + time + Plant + Animal + subject
-fits[["fido"]][["in-sample"]] <- fido(ts, 2, 2, fmla)
-ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts, fmla)
-ts_missing <- subset_values(ts, 1:8)
-ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts_missing, fmla)
+hyper <- list(sigma = 1, rho = 1, design = "~ 1 + time + Animal + Plant + subject")
+method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
+summaries <- plot_predictions(ts, method_eval$ts_preds)
+save(fido_eval, fido_summaries, file = "diet_fido.rda")
 ```
 
-The block below instead trains on five subjects from each intervention group and
-makes predictions for those who were held out.
+We can now do the same comparison with MDSINE2.
 
 ```{r}
-fits[["fido"]][["out-of-sample"]] <- fido(ts[c(1:5, 11:15)], 2, 2, fmla)
-ts_preds[["fido"]][["out-of-sample"]] <- fido_predict(fits[["fido"]][["out-of-sample"]], ts_missing[c(6:10, 16:20)], fmla)
-```
-
-
-```{r, fig.width = 10, fig.height = 6}
-subject_data(ts_preds[["fido"]][["in-sample"]]) <- subject_data(ts_preds[["fido"]][["in-sample"]]) |>
-  mutate(subject = as.factor(as.character(subject)))
-subject_data(ts_preds[["fido"]][["out-of-sample"]]) <- subject_data(ts_preds[["fido"]][["out-of-sample"]]) |>
-  mutate(subject = as.factor(as.character(subject)))
-reshaped_preds <- map_dfr(ts_preds[["fido"]], ~ reshape_preds(ts, .), .id = "generalization") |>
-  filter(h > 0, h < 6)
-
-reshaped_preds |>
-  mutate(h = glue("lag {h}")) |>
-  ggplot() +
-  geom_abline(slope = 1, col = "#400610") +
-  geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
-  facet_grid(factor(quantile, rev(levels(quantile))) ~ h, scales = "free_y") +
-  labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
-  scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
-  scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
-  scale_color_manual(values = c("#A65883", "#6593A6")) +
-  guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
-  theme(
-    axis.text = element_text(size = 10),
-    panel.spacing = unit(0, "line"),
-    strip.text.y = element_text(angle = 0, size = 12),
-    strip.text.x = element_text(angle = 0, size = 12),
-    legend.title = element_text(size = 14),
-    legend.text = element_text(size = 11),
-  )
-```
-
-```{r}
-taxonomy = data.frame(tax_id = 1:ncol(reads), name = paste0("tax", 1:ncol(reads)), kingdom = "bacteria", phylum = NA, class = NA, order = NA, family = NA, genus = NA, species = NA, sequence = NA)
-fit <- mdsine(ts, taxonomy)
-ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts, fmla)
-ts_missing <- subset_values(ts, 1:8)
-ts_preds[["fido"]][["in-sample"]] <- fido_predict(fits[["fido"]][["in-sample"]], ts_missing, fmla)
-
+taxonomy <- data.frame(tax_id = 1:ncol(reads), name = paste0("tax", 1:ncol(reads)), kingdom = "bacteria", phylum = NA, class = NA, order = NA, family = NA, genus = NA, species = NA, sequence = NA)
+hyper <- list(taxonomy = taxonomy)
+method_eval <- evaluate_splits(ts, tr_fun("mdsine", hyper), design = hyper$design)
+summaries <- plot_predictions(ts, method_eval$ts_preds)
+save(method_eval, summaries, file = "diet_mdsine.rda")
 ```
