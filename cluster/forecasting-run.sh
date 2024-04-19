@@ -27,6 +27,7 @@ if [[ $file_num -lt 1 ]]; then
   Rscript -e "mdsine::install_mdsine()"
 
   # run the model configuration
+  cp ../tf_sim.tar.gz .
   tar -zxvf tf_sim.tar.gz
   for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); do
     export RUN=$(printf %03d $i)
@@ -37,4 +38,5 @@ if [[ $file_num -lt 1 ]]; then
   mv scripts/*rda forecasting-${process}
   mv scripts/*html forecasting-${process}
   tar -zcvf forecasting-${process}.tar.gz forecasting-${process}
+  cp forecasting-${process}.tar.gz ../
 fi
