@@ -4,12 +4,13 @@ output:
   html_document:
     highlight: "kate"
 params:
-  outputs_dir: "tf_sim/"
+  outputs_dir: "/Users/krissankaran/Desktop/collaborations/microbiome_interventions/data/tf_sim"
   outputs_filter: "*rda"
 date: "`r Sys.Date()`"
 ---
 
 ```{r setup, include=FALSE}
+params <- list(outputs_dir = "/Users/krissankaran/Desktop/collaborations/microbiome_interventions/data/tf_sim", outputs_filter = "*rda")
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
@@ -17,11 +18,12 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 library(fido2)
 library(fs)
 library(glue)
-library(mbtransfer)
 library(mdsine)
+library(mbtransfer)
 library(tfPaper)
 library(tidyverse)
 theme_set(my_theme())
+reticulate::use_condaenv("/opt/miniconda3/envs/mdsine/")
 ```
 
 Comparison in MDSINE vs. mbtransfer predictions.
@@ -30,7 +32,7 @@ Comparison in MDSINE vs. mbtransfer predictions.
 paths <- dir_ls(params$outputs_dir, recurse = TRUE) |>
   path_filter(regexp=params$outputs_filter)
 
-load(paths[str_detect(paths, "sim_input_001")])
+load(paths[str_detect(paths, "sim_input_099")])
 interventions_df <- data.frame(interventions) |>
   rownames_to_column("sample")
 metadata <- metadata |>
@@ -56,18 +58,18 @@ data_config <- data_parameters() |>
 
 configurations <- configurations |>
   left_join(data_config) |>
-  filter(!(method == "mdsine" & n_taxa > 100))
+  filter(!(method == "mdsine" & n_taxa > 200))
 ```
 
 ```{r}
 cvs <- list()
-predict <- mdsine::predict
-cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, taxonomy), K = 4, seeds = 1:4)
+#predict <- mdsine::predict
+#cvs[["mdsine"]] <- cross_validate(ts, \(x) mdsine(x, taxonomy), K = 4, seeds = 1:4)
 predict <- mbtransfer::predict
-cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 4, 4), K = 4, seeds = 1:4)
+cvs[["mbtransfer"]] <- cross_validate(ts, \(x) mbtransfer(x, 2, 2), K = 4, seeds = 1:4)
 predict <- fido2::predict
-cvs[["fido"]] <- cross_validate(ts, \(x) fido(x, sigma = .5, rho = .5), K = 4, seeds = 1:4)
-saveRDS(cvs, "../data/compare-trajectories.rds")
+cvs[["fido"]] <- cross_validate(ts, \(x) fido(x, sigma = 1, rho = 1), K = 4, seeds = 1:4)
+saveRDS(cvs, "data/compare-trajectories.rds")
 #cvs <- readRDS("../data/compare-trajectories.rds")
 ```
 
@@ -151,5 +153,5 @@ ggplot(differenced_data) +
     panel.spacing.y = unit(0.1, "line"),
     panel.background = element_rect(fill = "#d3d3d3")
   )
-ggsave("~/Desktop/writing/202305/mbtransfer/figure/differenced_data.png", height = 4.5, width = 12)
+ggsave("differenced_data.png", height = 4.5, width = 12)
 ```
