@@ -1,8 +1,8 @@
 
 #' @export
-mdsine <- function(ts_inter, taxonomy) {
+mdsine <- function(ts_inter, taxonomy, ...) {
   data <- md_data(ts_inter, taxonomy)
-  fit <- do.call(mdsine_, data)
+  fit <- do.call(mdsine_, c(data, ...))
   new("mdsine_model", parameters = fit, method = "mdsine", hyper = list(taxonomy = taxonomy))
 }
 

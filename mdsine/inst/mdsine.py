@@ -23,8 +23,8 @@ def md_data(paths):
     perturbations=paths["perturbations"]
   )
   
-def mdsine(dataset, **kwargs):
-  params = set_params(model="NegBin", **kwargs)
+def mdsine(dataset, n_clusters=int(30), **kwargs):
+  params = set_params(model="NegBin")
   basepath = pathlib.Path(params.__dict__["OUTPUT_BASEPATH"])
   basepath.mkdir(exist_ok=True, parents=True)
   
@@ -40,7 +40,9 @@ def mdsine(dataset, **kwargs):
   a0 = md2.summary(mcmc_negbin.graph[STRNAMES.NEGBIN_A0])["mean"]
   a1 = md2.summary(mcmc_negbin.graph[STRNAMES.NEGBIN_A1])["mean"]
   params = set_params(model="MCMC", negbin_a0=a0, negbin_a1=a1, **kwargs)
+  params.INITIALIZATION_KWARGS["Clustering parameter"]["n_clusters"] = n_clusters
   mcmc = md2.initialize_graph(params=params, graph_name=dataset.name, subjset=dataset)
+
   return md2.run_graph(mcmc)
 
 
