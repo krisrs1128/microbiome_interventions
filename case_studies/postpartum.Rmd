@@ -1,0 +1,177 @@
+---
+title: "Postpartum Community Remodeling"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Postpartum Community Remodeling}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  comment = "#>"
+)
+```
+
+### Data and Problem Context
+
+```{r}
+library(fs)
+library(tidyverse)
+library(fido2)
+library(mdsine)
+library(mbtransfer)
+library(patchwork)
+library(glue)
+th <- theme_bw() +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "#f7f7f7"),
+    panel.border = element_rect(fill = NA, color = "#0c0c0c", linewidth = 0.6),
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+theme_set(th)
+set.seed(20230524)
+```
+
+```{r}
+tr_fun <- function(method, hyper = list()) {
+  function(x) {
+    if (method == "mdsine") {
+      mdsine(ts, hyper$taxonomy, n_clusters=hyper$n_clusters)
+    } else if (method == "mbtransfer") {
+      mbtransfer(ts, P = hyper$P, Q = hyper$Q)
+    } else if (method == "fido") {
+      fido(ts, sigma = hyper$sigma, rho = hyper$rho, design = hyper$design)
+    }
+  }
+}
+
+evaluate_splits <- function(ts, f, ...) {
+  fits <- list()
+  ts_preds <- list()
+
+  # in-sample performance
+  fits[["in-sample"]] <- f(ts)
+  ts_missing <- subset_values(ts, 1:12)
+  ts_preds[["in-sample"]] <- predict(fits[["in-sample"]], ts_missing, ...)
+  subject_data(ts_preds[["in-sample"]]) <- subject_data(ts_missing) |>
+    mutate(subject = as.factor(subject))
+
+  # out-of-sample performance
+  fits[["out-of-sample"]] <- f(ts[1:25])
+  ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[26:49], ...)
+  subject_data(ts_preds[["out-of-sample"]]) <- subject_data(ts[26:49]) |>
+    mutate(subject = as.factor(subject))
+  list(fits = fits, ts_preds = ts_preds)
+}
+
+plot_predictions <- function(ts, ts_preds) {
+  #browser()
+  reshaped_preds <- map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
+   filter(h > 0, h < 50) |>
+    mutate(h = 10 * floor(h / 10))
+
+  p <- reshaped_preds |>
+    mutate(h = glue("lag {h}")) |>
+    ggplot() +
+    geom_abline(slope = 1, col = "#400610") +
+    geom_point(aes(y, y_hat, col = generalization), size = .7, alpha = .6) +
+    facet_grid(factor(quantile, rev(levels(quantile))) ~ h, scales = "free_y") +
+    labs(x = expression(y), y = expression(hat(y)), col = "Generalization") +
+    scale_x_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_y_continuous(expand = c(0, 0), n.breaks = 3) +
+    scale_color_manual(values = c("#A65883", "#6593A6")) +
+    guides("color" = guide_legend(override.aes = list(size = 4, alpha = 1))) +
+    theme(
+      axis.text = element_text(size = 10),
+      panel.spacing = unit(0, "line"),
+      strip.text.y = element_text(angle = 0, size = 12),
+      strip.text.x = element_text(angle = 0, size = 12),
+      legend.title = element_text(size = 14),
+      legend.text = element_text(size = 11),
+    )
+
+  correlation <- reshaped_preds |>
+    group_by(h, quantile, generalization) |>
+    summarise(correlation = round(cor(y, y_hat), 4)) |>
+    pivot_wider(names_from = "generalization", values_from = "correlation") |>
+    arrange(desc(quantile), h)
+
+  list(p = p, correlation = correlation)
+}
+```
+
+To construct as `ts_inter` object, we combine the following datasets:
+
+* `reads`: A `data.frame` of taxonomic compositions. Rows are samples and columns
+are taxa.
+* `samples`: A `data.frame` of sample-level descriptors. This is expected to have
+`sample` and `time` columns. `sample` must match the rownames across `reads` and
+`interventions`.
+* `subject_data`: A `data.frame` of subject-level descriptors. This can be used
+to store information that is not time varying.
+* `interventions`: A `data.frame` of whose  rows are samples and columns are
+interventions. This can be either a binary matrix of whether a given
+intervention (column) was present in a sample. An input series can
+also be continuously valued -- see the aquaculture vignette ofr an example.
+
+We created these datasets by lightly processing the raw data from the published
+repository. Our processing script is available here. Note that we converted all
+the subject-level data to numeric variables -- `mbtransfer` does not know how to
+handle factor inputs, so they must be coded first.
+
+```{r}
+reads <- read_csv("https://figshare.com/ndownloader/files/40322782/reads.csv") |>
+  column_to_rownames("sample")
+samples <- read_csv("https://figshare.com/ndownloader/files/40322776/samples.csv")
+subject_data <- read_csv("https://figshare.com/ndownloader/files/40322773/subject.csv")
+interventions <- read_csv("https://figshare.com/ndownloader/files/40322770/interventions.csv") |>
+  column_to_rownames("sample")
+```
+
+````{r}
+ts <- reads |>
+  ts_from_dfs(interventions, samples, subject_data) |>
+  interpolate(delta = 14, method = "linear")
+
+ts
+```
+
+```{r}
+subject_data(ts) <- subject_data(ts) |>
+  select(subject, BirthControlYesNo) |>
+  mutate(BirthControlYesNo = ifelse(BirthControlYesNo == "Yes", 1, 0))
+```
+
+```{r}
+hyper <- list(sigma = 1, rho = 1, design = "~ BirthControlYesNo + time + subject")
+predict <- fido2::predict
+#method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
+#summaries <- plot_predictions(ts, method_eval$ts_preds)
+#save(method_eval, summaries, file = "postpartum_fido.rda")
+load("postpartum_fido.rda")
+```
+
+We can now do the same comparison with MDSINE2.
+
+```{r}
+# a hack -- mdsine requires a sample at time 0
+for (i in seq_along(ts)) {
+  min_above <- min(which(ts[[i]]@time >= 0))
+  ts[[i]]@time[min_above] <- 0
+}
+
+taxonomy <- data.frame(tax_id = 1:ncol(reads), name = paste0("tax", 1:ncol(reads)), kingdom = "bacteria", phylum = NA, class = NA, order = NA, family = NA, genus = NA, species = NA, sequence = NA)
+hyper <- list(taxonomy = taxonomy, n_clusters = as.integer(15))
+predict <- mdsine::predict
+#method_eval <- evaluate_splits(ts, tr_fun("mdsine", hyper))
+load("postpartum_mdsine.rda")
+#summaries <- plot_predictions(ts, method_eval$ts_preds)
+#save(method_eval, summaries, file = "postpartum_mdsine.rda")
+```
