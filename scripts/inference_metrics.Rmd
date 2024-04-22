@@ -88,8 +88,8 @@ effects and is just aimed at detecting whether the intervention has any effect
 at all.
 
 ```{r, averaging_baseline}
-pre <- which(colData(dds)$time > -hyper[[1]]$Q, colData(dds)$time < 0)
-post <- which(colData(dds)$time < hyper[[1]]$Q, colData(dds)$time >= 0)
+pre <- which(colData(dds)$time > -2 * hyper[[1]]$Q, colData(dds)$time < 0)
+post <- which(colData(dds)$time < 2 * hyper[[1]]$Q, colData(dds)$time >= 0)
 
 p_values <- vector(length = nrow(dds))
 for (j in seq_len(nrow(dds))) {
