@@ -155,7 +155,12 @@ predict <- fido2::predict
 #method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
 #summaries <- plot_predictions(ts, method_eval$ts_preds)
 #save(method_eval, summaries, file = "postpartum_fido.rda")
-load("postpartum_fido.rda")
+```
+
+```{r}
+load("case_studies/postpartum_fido.rda")
+ggsave("postpartum_fido_predictions.png", width = 10, height = 6)
+write_csv(summaries$correlation, file = "postpartum_fido_correlations.csv")
 ```
 
 We can now do the same comparison with MDSINE2.

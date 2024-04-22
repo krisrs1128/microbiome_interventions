@@ -99,13 +99,13 @@ evaluate_splits <- function(ts, f, ...) {
   fits[["in-sample"]] <- f(ts)
   ts_missing <- subset_values(ts, 1:8)
   ts_preds[["in-sample"]] <- predict(fits[["in-sample"]], ts_missing, ...)
-  subject_data(ts_preds[["in-sample"]]) <- subject_data(ts_preds[["in-sample"]]) |>
+  subject_data(ts_preds[["in-sample"]]) <- subject_data(ts_missing) |>
     mutate(subject = as.factor(subject))
 
   # out-of-sample performance
   fits[["out-of-sample"]] <- f(ts[c(1:5, 11:15)])
   ts_preds[["out-of-sample"]] <- predict(fits[["out-of-sample"]], ts_missing[c(6:10, 16:20)], ...)
-  subject_data(ts_preds[["out-of-sample"]]) <- subject_data(ts_preds[["out-of-sample"]]) |>
+  subject_data(ts_preds[["out-of-sample"]]) <- subject_data(ts[c(1:5, 11:15)]) |>
     mutate(subject = as.factor(subject))
   list(fits = fits, ts_preds = ts_preds)
 }
@@ -150,9 +150,16 @@ subject_data(ts) <- subject_data(ts) |>
   mutate(subject = as.factor(subject))
 
 hyper <- list(sigma = 1, rho = 1, design = "~ 1 + time + Animal + Plant + subject")
-method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
-summaries <- plot_predictions(ts, method_eval$ts_preds)
-save(fido_eval, fido_summaries, file = "diet_fido.rda")
+predict <- fido2::predict
+#method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
+#summaries <- plot_predictions(ts, method_eval$ts_preds)
+#save(method_eval, summaries, file = "diet_fido.rda")
+```
+
+```{r}
+load("case_studies/diet_fido.rda")
+ggsave("case_studies/diet_fido_predictions.png", summaries$p + labs(title = "Fido on the Diet Intervention Study"), width = 10, height = 6)
+write_csv(summaries$correlation, file = "diet_fido_correlations.csv")
 ```
 
 We can now do the same comparison with MDSINE2.
@@ -160,7 +167,14 @@ We can now do the same comparison with MDSINE2.
 ```{r}
 taxonomy <- data.frame(tax_id = 1:ncol(reads), name = paste0("tax", 1:ncol(reads)), kingdom = "bacteria", phylum = NA, class = NA, order = NA, family = NA, genus = NA, species = NA, sequence = NA)
 hyper <- list(taxonomy = taxonomy)
-method_eval <- evaluate_splits(ts, tr_fun("mdsine", hyper), design = hyper$design)
-summaries <- plot_predictions(ts, method_eval$ts_preds)
-save(method_eval, summaries, file = "diet_mdsine.rda")
+predict <- mdsine::predict
+#method_eval <- evaluate_splits(ts, tr_fun("mdsine", hyper))
+#summaries <- plot_predictions(ts, method_eval$ts_preds)
+#save(method_eval, summaries, file = "diet_mdsine.rda")
+```
+
+```{r}
+load("case_studies/diet_mdsine.rda")
+ggsave("case_studies/diet_mdsine_predictions.png", summaries$p + ylim(0, 20) + labs(title = "MDSINE2 for the Diet Intervention Study"), width = 10, height = 6)
+write_csv(summaries$correlation, file = "diet_mdsine_correlations.csv")
 ```

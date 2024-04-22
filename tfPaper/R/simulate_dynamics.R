@@ -195,8 +195,6 @@ generate_sample <- function(log_theta0, w, z, step_generator, sampler) {
     log_theta[, i] <- step_generator$fun(log_theta[, (i - P):(i - 1), drop = F], w[, (i - Q + 1):i, drop = F], z)
     x[, i] <- sampler(log_theta[, i])
   }
-  browser()
-
   x
 }
 
