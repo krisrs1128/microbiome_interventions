@@ -2,7 +2,7 @@
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
 
 # copy and check if results already exist
-test_output=/staging/ksankaran/microbiome_interventions/inference-${process}.tar.gz
+test_output=outputs/inference-${process}.tar.gz
 if [ -f $test_output ]; then
   cp $test_output .
   tar -zxvf inference-${process}.tar.gz || true
@@ -21,10 +21,8 @@ if [[ $file_num -lt 1 ]]; then
   Rscript -e "devtools::install_github('krisrs1128/mbtransfer')"
 
   # copy over data  
-  cp /staging/ksankaran/microbiome_interventions/tf_sim.tar.gz .
+  cp ../tf_sim.tar.gz .
   tar -zxvf tf_sim.tar.gz
-
-  #process=$((process + 54))
 
   # run the model configuration
   for i in $(seq $((batch_size * process + 1)) $((batch_size * (process + 1)))); do
@@ -36,6 +34,6 @@ if [[ $file_num -lt 1 ]]; then
   mv scripts/*rda inference-${process}
   mv scripts/*html inference-${process}
   tar -zcvf inference_result-${process}.tar.gz inference-${process}
-  cp inference_result*tar.gz /staging/ksankaran/microbiome_interventions/
+  cp inference_result*tar.gz ../
 
 fi;
