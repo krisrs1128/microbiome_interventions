@@ -72,9 +72,8 @@ evaluate_splits <- function(ts, f, ...) {
 }
 
 plot_predictions <- function(ts, ts_preds) {
-  #browser()
   reshaped_preds <- map_dfr(ts_preds, ~ reshape_preds(ts, .), .id = "generalization") |>
-   filter(h > 0, h < 50) |>
+    filter(h > 0, h < 50) |>
     mutate(h = 10 * floor(h / 10))
 
   p <- reshaped_preds |>
@@ -150,17 +149,26 @@ subject_data(ts) <- subject_data(ts) |>
 ```
 
 ```{r}
-hyper <- list(sigma = 1, rho = 1, design = "~ BirthControlYesNo + time + subject")
+hyper <- list(sigma = 10, rho = 0.1, design = "~ BirthControlYesNo + time + subject")
 predict <- fido2::predict
-#method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
-#summaries <- plot_predictions(ts, method_eval$ts_preds)
-#save(method_eval, summaries, file = "postpartum_fido.rda")
+method_eval <- evaluate_splits(ts, tr_fun("fido", hyper), design = hyper$design)
+
+for (j in seq_along(method_eval$ts_preds[[2]])) {
+  x <- values(method_eval$ts_preds[[2]][[j]])
+  for (i in seq_len(nrow(x))) {
+    x[i, is.na(x[i, ])] <- mean(x[i, ], na.rm = TRUE)
+  }
+  values(method_eval$ts_preds[[2]][[j]]) <- x
+}
+
+summaries <- plot_predictions(ts, method_eval$ts_preds)
+save(method_eval, summaries, file = "case_studies/postpartum_fido.rda")
 ```
 
 ```{r}
-load("case_studies/postpartum_fido.rda")
-ggsave("postpartum_fido_predictions.png", width = 10, height = 6)
-write_csv(summaries$correlation, file = "postpartum_fido_correlations.csv")
+#load("case_studies/postpartum_fido.rda")
+ggsave("case_studies/postpartum_fido_predictions.png", summaries$p + labs("Fido applied to Postpartum Data") + ylim(0, 14), width = 10, height = 6)
+write_csv(summaries$correlation, file = "case_studies/postpartum_fido_correlations.csv")
 ```
 
 We can now do the same comparison with MDSINE2.
