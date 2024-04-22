@@ -2,6 +2,7 @@
 # docker run --user $(id -u):$(id -g) --rm=true -it -v $(pwd):/scratch -w /scratch 19e1c2fc5a7d /bin/bash
   
 # check if results already exist
+process=$((process + 1403))
 tar -zxvf outputs.tar.gz
 test_output=outputs/forecasting-${process}.tar.gz
 if [ -f $test_output ]; then

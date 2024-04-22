@@ -10,4 +10,4 @@ transfer_input_files = microbiome_interventions.tar.gz,outputs.tar.gz,tf_sim.tar
 request_cpus = 1
 request_memory = 60GB
 request_disk = 8GB
-queue 1404
+queue 120
