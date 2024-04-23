@@ -15,8 +15,7 @@ Rscript -e "mdsine::install_mdsine()"
 # run the model configuration
 cp ../tf_sim.tar.gz .
 tar -zxvf tf_sim.tar.gz
-Rscript -e "rmarkdown::render('scripts/compare_model_trajectories.Rmd', params = list(data_dir = '../tf_sim/', run_id=${RUN}))"
-done
+Rscript -e "source(knitr::purl('scripts/compare_model_trajectories.Rmd'))"
 
 mkdir comparison-run
 mv scripts/*rda comparison-run

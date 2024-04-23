@@ -4,13 +4,12 @@ output:
   html_document:
     highlight: "kate"
 params:
-  outputs_dir: "/Users/krissankaran/Desktop/collaborations/microbiome_interventions/data/tf_sim"
+  outputs_dir: "../tf_sim"
   outputs_filter: "*rda"
 date: "`r Sys.Date()`"
 ---
 
 ```{r setup, include=FALSE}
-#params <- list(outputs_dir = "/Users/krissankaran/Desktop/collaborations/microbiome_interventions/data/tf_sim", outputs_filter = "*rda")
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
