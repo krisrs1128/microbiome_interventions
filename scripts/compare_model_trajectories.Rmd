@@ -5,6 +5,7 @@ output:
     highlight: "kate"
 params:
   outputs_dir: "../tf_sim"
+#  outputs_dir: "../data/simulation_output/tf_sim"
   outputs_filter: "*rda"
 date: "`r Sys.Date()`"
 ---
