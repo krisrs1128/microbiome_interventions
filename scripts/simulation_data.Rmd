@@ -5,7 +5,7 @@ output:
     highlight: "kate"
 date: "`r Sys.Date()`"
 params:
-  run_id: 8
+  run_id: 36
 ---
 
 ```{r setup, include=FALSE}
@@ -144,7 +144,7 @@ taxonomy <- create_tree(2 * n_taxa + 1, 2) |>
 save(reads, Sigma, interventions, metadata, subject_data, taxonomy, nonnull_taxa, file = output_path)
 ```
 
-```{r, eval = FALSE, fig.width = 8, fig.height = 4}
+```{r, eval = TRUE, fig.width = 8, fig.height = 4}
 values_df <- data.frame(reads) |>
   rownames_to_column("sample") |>
   pivot_longer(-sample, names_to = "taxon") |>
@@ -155,12 +155,12 @@ values_df <- data.frame(reads) |>
   left_join(rownames_to_column(data.frame(interventions), "sample"))
   
 ggplot(values_df, aes(time, reorder(subject, value))) +
-  geom_tile(aes(fill = value, col = as.factor(P1), size = P1)) +
+  geom_tile(aes(fill = value, col = as.factor(P1), linewidth = P1)) +
   facet_wrap(~ taxon) +
   labs(x = "Time", y = "Subject", fill = "Quantile") +
   scale_fill_gradient(low = "#eaf7f7", high = "#037F8C") +
-  scale_color_manual(values = c("#F2E8DF", "#BF3945"), guide = FALSE) +
-  scale_size(range = c(0, .25), guide = FALSE) +
+  scale_color_manual(values = c("#F2E8DF", "#BF3945"), guide = "none") +
+  scale_linewidth(range = c(0, .3), guide = "none") +
   scale_x_continuous(expand = c(0, 0)) +
   theme(
     axis.ticks.y = element_blank(),
