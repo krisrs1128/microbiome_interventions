@@ -176,7 +176,7 @@ testing_results |>
     baseline_lambda = glue("λ = {baseline_lambda}"),
     phylo_alpha = glue("𝛼 = {phylo_alpha}"),
     lag = glue("Lag {lag}"),
-    method = ifelse(method == "avg", "Window\nt-test", method),
+    method = ifelse(method == "avg", "Pre/Post\nt-test", method),
     n_taxa = glue("{n_taxa} taxa")
   ) |>
   ggplot() +
@@ -209,4 +209,3 @@ summary_table <- testing_results |>
 
 write_csv(summary_table, "summary_table_fdp.csv")
 ```
-
